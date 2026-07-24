@@ -1,0 +1,11 @@
+# The pmaports clone is a reproducible build input, NOT our code.
+# Re-create it with scripts/setup-pmaports.sh. Never commit it.
+/pmaports/
+
+# Build artifacts / images
+*.img
+*.tar.gz
+*.zip
+
+# OS cruft
+.DS_Store
