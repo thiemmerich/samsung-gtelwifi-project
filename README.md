@@ -1,4 +1,4 @@
-# samsung-gtelwifi-project
+# Samsung Galaxy Tab E 2015 (gtelwifi)
 
 [🇺🇸 English](README.md) · [🇧🇷 Português (Brasil)](README.pt-br.md)
 
