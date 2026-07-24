@@ -2,6 +2,9 @@
 # Re-create it with scripts/setup-pmaports.sh. Never commit it.
 /pmaports/
 
+# pmbootstrap tool clone (installed via git, symlinked to ~/.local/bin). Not our code.
+/pmbootstrap/
+
 # Build artifacts / images
 *.img
 *.tar.gz
