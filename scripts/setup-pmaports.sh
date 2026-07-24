@@ -22,5 +22,15 @@ git clone "$REPO_URL" "$DEST"
 echo "Creating branch $BRANCH at known-good commit $KNOWN_GOOD ..."
 git -C "$DEST" checkout -b "$BRANCH" "$KNOWN_GOOD"
 
+# Apply our fixes for tooling drift since the pin (see patches/ and quest/PHASE0.md).
+PATCHDIR="$(cd "$(dirname "$0")/.." && pwd)/patches"
+if ls "$PATCHDIR"/*.patch >/dev/null 2>&1; then
+	echo "Applying our patches from $PATCHDIR ..."
+	for p in "$PATCHDIR"/*.patch; do
+		echo "  git apply $(basename "$p")"
+		git -C "$DEST" apply "$p"
+	done
+fi
+
 echo "Done. Device package: device/downstream/device-samsung-gtelwifi"
 echo "Kernel package:  device/downstream/linux-samsung-gtelwifi (3.10.17 fork)"

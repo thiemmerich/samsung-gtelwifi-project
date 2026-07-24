@@ -53,3 +53,21 @@ toolchain? Paste the tail of the output back:
 - Success → look for `linux-samsung-gtelwifi-*.apk` built. Then Phase 1 (flashing).
 - Failure → almost certainly a GCC/compile error; paste it and we patch (there are
   already gcc7/8/10 survival patches in the package to extend).
+
+## Build attempt 1 (2026-07-24)
+Got past DNS (transient) and toolchain setup. Cross-compiler installed:
+**gcc-armv7 15.2.0** (GCC 15 vs a 2015 kernel — noted for later).
+
+Failed NOT at compile but at APKBUILD *validation*:
+```
+>>> ERROR: linux-samsung-gtelwifi: Forbidden character(s) in filename
+    fix-dtb_qcom,msm-id.patch: ,
+```
+Cause: current `abuild 3.18.0_rc3` forbids commas in source filenames; the pinned
+package (fine in June 2026) has `fix-dtb_qcom,msm-id.patch`. Pure tooling drift.
+
+**Fix** (patches/0001-abuild-forbid-comma-in-source-filename.patch):
+renamed `fix-dtb_qcom,msm-id.patch` -> `fix-dtb_qcom-msm-id.patch` and updated the
+APKBUILD `source=` + `sha512sums` (content/hash unchanged, only the name).
+
+The actual kernel compile still hasn't run — re-run the build to reach it.
