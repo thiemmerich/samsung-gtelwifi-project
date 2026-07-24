@@ -93,3 +93,19 @@ Builds the device package + initramfs and assembles a flashable rootfs + boot im
 for gtelwifi (console UI, OpenRC). Mostly downloads prebuilt base packages. It may
 prompt for an on-device user password (fine in a real terminal). After that -> Phase 1
 (recovery prep + heimdall flashing).
+
+## install: the packaging gauntlet (2026-07-24)
+`pmbootstrap install` needed several fixes, all old-pin-vs-current-tooling drift:
+1. **Firmware not auto-built** -> must run `pmbootstrap build firmware-samsung-gtelwifi`
+   first (it lives in device/testing/, a different category from the device pkg).
+2. **Edge drift**: base packages 404'd (mirror rotated 65-r0 -> 66-r0, zram 3 -> 4).
+   Fix: `pmbootstrap update` to refresh the index to versions that still exist.
+3. **Orphaned stale APKINDEX**: cache_apk_armv7 held BOTH old (65-r0) and new (66-r0)
+   index files (different URL hashes), and apk read the stale one. Fix:
+   `sudo rm -f ~/.local/var/pmbootstrap/cache_apk_armv7/APKINDEX*.tar.gz` then reinstall.
+4. **Schema drift**: deviceinfo_schema.toml `header_version` had `integer_interval`
+   but no `datatype = "integer"`; pmbootstrap 3.11.1 now enforces the pairing.
+   Fix: patches/0002-deviceinfo-schema-header_version-datatype.patch.
+
+Reusable recipe if edge drifts again mid-session:
+`pmbootstrap update && pmbootstrap -y install` (add the APKINDEX rm if 404s persist).
