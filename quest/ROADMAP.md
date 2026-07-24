@@ -53,8 +53,9 @@ pleasant is. Keep pmOS's exact kernel + its exact modules together — never mix
 - [x] Configure: samsung / gtelwifi, console UI, OpenRC (no systemd), edge channel.
 - [x] **Build the 3.10 kernel** -> `linux-samsung-gtelwifi-3.10.17-r5.apk` (vmlinuz + dt.img).
       **BLOCKER 1 CLEARED** — compiles clean on GCC 15.2.0 (the feared wall never appeared).
-- [ ] `pmbootstrap install` -> assemble the full bootable Alpine image (NEXT).
-- **Exit criterion:** compiles + yields a flashable image. Compile ✓; image pending.
+- [x] `pmbootstrap install` -> full bootable Alpine image assembled (`samsung-gtelwifi.img`).
+- **Exit criterion:** compiles + yields a flashable image. ✓✓ **PHASE 0 COMPLETE (2026-07-24).**
+      Needed 2 patches (abuild rename, schema datatype) + build firmware pkg + index refresh.
 
 ### Phase 1 — First hardware contact (boot Alpine)
 - [ ] **RECOVERY FIRST:** download stock SM-T560 firmware; confirm Odin/heimdall download-mode
