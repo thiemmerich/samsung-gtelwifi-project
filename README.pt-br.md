@@ -52,4 +52,31 @@ cerca de um mês. Então partimos de uma base recente e provavelmente ainda comp
 
 ## Status
 
-Fase 0 (build no host, risco zero para o aparelho). Veja o checklist no roadmap.
+**Fase 0 concluída (24/07/2026)** — o port arquivado (junho/2026) compila e gera uma
+imagem inicializável (`samsung-gtelwifi.img`) com as ferramentas atuais. A seguir:
+**Fase 1** — gravar no aparelho, recuperação primeiro. Veja [quest/ROADMAP.md](quest/ROADMAP.md),
+[quest/PHASE0.md](quest/PHASE0.md), [quest/PHASE1.md](quest/PHASE1.md).
+
+## Achados da Fase 0 (o que foi preciso para reviver o port)
+
+O port foi arquivado por estar **sem mantenedor, não por estar quebrado**. Revivê-lo a
+partir do commit `a1ceca353` foi, na maior parte, corrigir a defasagem entre o pin de
+junho e as ferramentas de julho:
+
+- O **pmbootstrap** agora instala via git (todas as versões do PyPI foram removidas). Seu
+  `init` interativo (sem TTY sob automação) foi contornado com um
+  `~/.config/pmbootstrap_v3.cfg` escrito à mão + work dir.
+- Forçado `service_manager = openrc` — **sem systemd** (systemd exige kernel ≥4.x; o nosso é 3.10).
+- **O kernel compila limpo no GCC 15.2.0** — o temido "GCC 15 vs kernel de 2015" nunca
+  apareceu; os patches gcc7/8/10 existentes bastaram. *(Bloqueador 1 resolvido.)*
+- Dois ajustes de uma linha, guardados como patches reproduzíveis (aplicados por `scripts/setup-pmaports.sh`):
+  - **`patches/0001`** — o `abuild` atual proíbe vírgulas em nomes de arquivo de source
+    (`fix-dtb_qcom,msm-id.patch` → `fix-dtb_qcom-msm-id.patch`).
+  - **`patches/0002`** — o `header_version` do `deviceinfo_schema.toml` precisava de
+    `datatype = "integer"` junto ao seu `integer_interval` (agora obrigatório).
+- O pacote de firmware do WiFi (`firmware-samsung-gtelwifi`, em `device/testing/`) precisa
+  ser **compilado separadamente** antes do `pmbootstrap install`.
+- **Deriva do edge**: os pacotes base giram rápido (ex.: `postmarketos-base` 65→66-r0). Em
+  404: `pmbootstrap update`, e limpe `cache_apk_armv7/APKINDEX*` se persistir.
+
+Resultado: uma imagem gravável `samsung-gtelwifi.img` — UI console, OpenRC, o kernel 3.10 + firmware BCM4343.
