@@ -20,6 +20,7 @@ samsung-gtelwifi-project/
 ├── quest/        # our roadmap, notes, capability sheet, logs
 ├── patches/      # our diffs to the gtelwifi kernel/device packages
 ├── scripts/      # setup / build / flash helpers
+├── vendor/       # provenance + checksums for the mirrored irreplaceable sources
 └── pmaports/     # pmOS clone — BUILD INPUT, gitignored (recreate via script)
 ```
 
