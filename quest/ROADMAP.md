@@ -48,11 +48,13 @@ pleasant is. Keep pmOS's exact kernel + its exact modules together — never mix
 ## Roadmap (climb the ladder — each rung is a shippable win)
 
 ### Phase 0 — Host-side build, zero device risk
-- [ ] Create working branch at commit `a1ceca353`.
-- [ ] Install the matching pmbootstrap (~June 2026 release).
-- [ ] `pmbootstrap init` -> select samsung / gtelwifi.
-- [ ] Build kernel + device pkg; produce a bootable Alpine image.
-- **Exit criterion:** it *compiles* and yields an image. De-risks Blocker 1 before touching hardware.
+- [x] Create working branch at commit `a1ceca353`.
+- [x] Install pmbootstrap (3.11.1 via git; PyPI releases yanked) + configure non-interactively.
+- [x] Configure: samsung / gtelwifi, console UI, OpenRC (no systemd), edge channel.
+- [x] **Build the 3.10 kernel** -> `linux-samsung-gtelwifi-3.10.17-r5.apk` (vmlinuz + dt.img).
+      **BLOCKER 1 CLEARED** — compiles clean on GCC 15.2.0 (the feared wall never appeared).
+- [ ] `pmbootstrap install` -> assemble the full bootable Alpine image (NEXT).
+- **Exit criterion:** compiles + yields a flashable image. Compile ✓; image pending.
 
 ### Phase 1 — First hardware contact (boot Alpine)
 - [ ] **RECOVERY FIRST:** download stock SM-T560 firmware; confirm Odin/heimdall download-mode

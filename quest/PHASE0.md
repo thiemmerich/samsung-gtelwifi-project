@@ -71,3 +71,25 @@ renamed `fix-dtb_qcom,msm-id.patch` -> `fix-dtb_qcom-msm-id.patch` and updated t
 APKBUILD `source=` + `sha512sums` (content/hash unchanged, only the name).
 
 The actual kernel compile still hasn't run — re-run the build to reach it.
+
+## Build attempt 2 (2026-07-24) — SUCCESS
+```
+=> edge/linux-samsung-gtelwifi: Building package (cross compiling: cross-native)
+=> edge/linux-samsung-gtelwifi: Done!   (~7 min)
+```
+**BLOCKER 1 CLEARED.** The 3.10.17 kernel cross-compiled cleanly with **gcc-armv7
+15.2.0** — no GCC-15 breakage despite the age gap. Output:
+`~/.local/var/pmbootstrap/packages/edge/armv7/linux-samsung-gtelwifi-3.10.17-r5.apk`
+(5.2 MB), containing `boot/vmlinuz` + `boot/dt.img`.
+
+Only fix needed vs. the pin was the abuild comma-filename rename (patch 0001).
+The gcc7/8/10 survival patches already in the package were sufficient.
+
+## NEXT: assemble the bootable image
+```sh
+pmbootstrap -y install
+```
+Builds the device package + initramfs and assembles a flashable rootfs + boot image
+for gtelwifi (console UI, OpenRC). Mostly downloads prebuilt base packages. It may
+prompt for an on-device user password (fine in a real terminal). After that -> Phase 1
+(recovery prep + heimdall flashing).
