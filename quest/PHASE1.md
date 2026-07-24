@@ -4,6 +4,13 @@
 hardware (screen via sprdfb, login, dmesg, then WiFi). This is the first step that
 touches the device and is *not* reversible-for-free.
 
+## Status — BLOCKED on a data cable (2026-07-24)
+Ran the non-destructive comms test. Result: plugging the tablet in produced **zero** USB
+kernel events (`lsusb`/`dmesg` unchanged), while the PC's other USB devices enumerate fine
+=> **all local cables are charge-only** (no data lines). PC USB stack is healthy; nothing
+wrong with the build. **Need a data-capable USB cable** before flashing can proceed.
+While waiting: download the stock SM-T560 firmware (recovery undo-button).
+
 ## Artifacts from Phase 0
 - rootfs: `~/.local/var/pmbootstrap/chroot_native/home/pmos/rootfs/samsung-gtelwifi.img`
 - kernel+initramfs: `~/.local/var/pmbootstrap/chroot_rootfs_samsung-gtelwifi/boot`
