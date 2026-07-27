@@ -5,6 +5,9 @@
 # pmbootstrap tool clone (installed via git, symlinked to ~/.local/bin). Not our code.
 /pmbootstrap/
 
+# Stock recovery firmware (~1.6G, Samsung's, not ours). Keep local, never commit.
+/old-firmware/
+
 # Build artifacts / images
 *.img
 *.tar.gz
