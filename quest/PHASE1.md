@@ -4,12 +4,19 @@
 hardware (screen via sprdfb, login, dmesg, then WiFi). This is the first step that
 touches the device and is *not* reversible-for-free.
 
-## Status — BLOCKED on a data cable (2026-07-24)
-Ran the non-destructive comms test. Result: plugging the tablet in produced **zero** USB
-kernel events (`lsusb`/`dmesg` unchanged), while the PC's other USB devices enumerate fine
-=> **all local cables are charge-only** (no data lines). PC USB stack is healthy; nothing
-wrong with the build. **Need a data-capable USB cable** before flashing can proceed.
-While waiting: download the stock SM-T560 firmware (recovery undo-button).
+## Status — comms VERIFIED (2026-07-24)
+Charge-only cables were the blocker; a real data cable fixed it. With a data cable +
+download mode:
+- `lsusb`: `04e8:685d SAMSUNG USB DRIVER (Download mode)`, high-speed link.
+- `heimdall detect` -> **Device detected** (no sudo needed; udev perms OK). heimdall v2.0.2.
+- `heimdall print-pit --no-reboot` -> exit 0, full partition table read, clean session.
+  Partitions incl.: BOOT BOOT2 SBOOT MODEM PARAM efs KERNEL RECOVERY CSC SYSTEM userdata.
+=> **bidirectional comms proven** — we can flash AND recover. Rule 0 read-path satisfied.
+
+### Remaining gate before the (destructive) flash
+- [ ] **Stock SM-T560 firmware** downloaded (the undo button).
+- [ ] Tablet **backed up** (flash wipes it).
+Flash targets: boot.img -> BOOT partition, rootfs -> SYSTEM partition.
 
 ## Artifacts from Phase 0
 - rootfs: `~/.local/var/pmbootstrap/chroot_native/home/pmos/rootfs/samsung-gtelwifi.img`
