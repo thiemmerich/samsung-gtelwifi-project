@@ -18,6 +18,19 @@ download mode:
 - [ ] Tablet **backed up** (flash wipes it).
 Flash targets: boot.img -> BOOT partition, rootfs -> SYSTEM partition.
 
+### Resume point (paused mid-session)
+Comms verified; only the stock firmware (recovery net) is left before flashing.
+- Get firmware: samfw.com/firmware/**SM-T560** (NOT T560NU). Drill in: region -> a
+  build (`T560XXU…`) -> Download button is on the build page (below the info table).
+  Brazil CSC = ZTO/ZTA/BTU; if absent, ANY SM-T560 build restores a bootable tablet.
+  Alternatives: Frija tool, samfrew.com, sammobile.com.
+- No user data to back up (game tablet). Bootloader untouched -> download mode always
+  reachable, so a true brick isn't possible.
+- heimdall v2.0.2 CANNOT dump partition contents (only detect / download-pit / flash),
+  so no heimdall-based backup — stock firmware is the recovery net.
+- THEN flash: `pmbootstrap flasher flash_kernel` + `pmbootstrap flasher flash_rootfs`
+  (device in download mode), then power on and watch for screen + console login.
+
 ## Artifacts from Phase 0
 - rootfs: `~/.local/var/pmbootstrap/chroot_native/home/pmos/rootfs/samsung-gtelwifi.img`
 - kernel+initramfs: `~/.local/var/pmbootstrap/chroot_rootfs_samsung-gtelwifi/boot`
