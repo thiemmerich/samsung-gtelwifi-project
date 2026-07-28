@@ -85,7 +85,9 @@ sudo nmcli device set "$IFACE" managed no
 sudo ip link set "$IFACE" up && sudo ip addr add 172.16.42.2/24 dev "$IFACE"
 ssh -i ~/pmos-odin/tablet_key user@172.16.42.1               # key login; pw = set at last install
 ```
-Tablet is `172.16.42.1`, host is `.2`. If the iface is empty, the gadget hasn't enumerated yet — wait ~20s.
+Tablet is **`172.16.42.1` — SSH to `.1`, NOT `.2`** (`.2` is your PC). First connect prompts to
+accept the ED25519 host key → type `yes`. Success = `Welcome to postmarketOS! o/` and a
+`samsung-gtelwifi:~$` shell. If `$IFACE` is empty, the USB gadget hasn't enumerated yet — wait ~20s.
 
 ## BUILD → FLASH a new image (the full working loop)
 ```sh
