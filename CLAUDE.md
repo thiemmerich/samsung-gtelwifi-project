@@ -10,11 +10,15 @@ Spreadtrum SC7730, armv7)** by gluing the postmarketOS reverse-engineered **down
 Raspberry-Pi-OS port (Broadcom kernel can't move) — it's kernel-glue + a Debian-family
 rootfs. End goal: **Devuan (no systemd) + LXDE**, Windows-like feel. See `quest/ROADMAP.md`.
 
-## STATUS (2026-07-28) — postmarketOS BOOTS, SSH WORKS ✅
-- Kernel `3.10.17 #N-postmarketOS` runs on the tablet; `/` (pmOS_root) mounted rw; core
-  services up; **`ssh user@172.16.42.1` works** over USB networking.
-- **Remaining:** garbled **16bpp display** (stride is correct → it's a color-format /
-  RGB-vs-BGR issue, debuggable live over SSH). Then Phase 3/4: swap console→Devuan, add LXDE.
+## STATUS (2026-07-28) — BOOTS + SSH + DISPLAY all WORK ✅✅✅
+- Kernel `3.10.17 #N-postmarketOS` runs; `/` (pmOS_root) mounted rw; services up;
+  **`ssh user@172.16.42.1` works**; **the console renders on the panel** (login prompt visible).
+- Display was NOT a color/geometry bug: `# CONFIG_FRAMEBUFFER_CONSOLE is not set` (only a
+  dummy vtcon existed) → nothing drew to the framebuffer, so the boot splash sat frozen. A raw
+  red fill of /dev/fb0 proved the panel is perfect. Fix: enable `CONFIG_FRAMEBUFFER_CONSOLE=y`
+  + `CONFIG_FONT_8x16=y` (in patch 0001) → readable console. (Same class as the seccomp fix.)
+- **Remaining:** on-device input (tablet has NO keyboard — use SSH now, or a USB-OTG keyboard,
+  or the eventual on-screen keyboard). Then per ROADMAP: hw inventory → Devuan (no systemd) → LXDE.
 
 ## The device (facts that matter)
 - SM-T560 = **Spreadtrum** `gtelwifi` (NOT the Qualcomm SM-T560NU/`gtelwifiue`). armv7, panel 800x1280, WiFi-only (no modem).

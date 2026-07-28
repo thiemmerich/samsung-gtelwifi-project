@@ -139,3 +139,12 @@ Framebuffer diag over SSH: sprdfb, 16bpp, stride=1600 (CORRECT for 800px), virtu
 a 16bpp color-format / RGB-vs-BGR mismatch (the kernel already ships sprdfb-fix-swapped-colors).
 Debuggable live over SSH now. Next: inspect /dev/fb0 format, try fbcon/color tweaks, then Xorg
 fbdev for the eventual LXDE desktop.
+
+## DISPLAY FIXED — usable console on the panel (2026-07-28)
+The "garbled screen" was the frozen boot splash, NOT a color/geometry bug (a raw red fill of
+/dev/fb0 over SSH turned the panel solid red -> framebuffer + colors perfect). Root cause:
+`# CONFIG_FRAMEBUFFER_CONSOLE is not set` (vtcon0 was `(S) dummy device`, no fbcon), so the
+getty rendered to a void and the splash stayed on screen. Fix: `CONFIG_FRAMEBUFFER_CONSOLE=y`
++ `CONFIG_FRAMEBUFFER_CONSOLE_DETECT_PRIMARY=y` + `CONFIG_FONT_8x16=y`, rebuild -> tablet shows
+`samsung-gtelwifi login:` on its own screen. THE CORE QUEST IS DONE: boots + SSH + display.
+On-device typing needs a USB-OTG keyboard or (Phase 4) an on-screen keyboard; SSH works today.
