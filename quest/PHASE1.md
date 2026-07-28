@@ -170,3 +170,22 @@ Got a full touch-driven LXQt desktop on the tablet. Path:
 Result: LXQt desktop on the panel, opened Power Management via touch, battery reads 53%. The
 2015 Galaxy Tab E runs a real Linux desktop. Next (tomorrow): Bluetooth (enable CONFIG_BT +
 BT_HIDP in kernel, then Broadcom-over-UART bring-up) for wireless mouse/keyboard.
+
+## Phase 2 progress: WiFi + desktop findings (2026-07-28)
+- **WiFi WORKS** (BCM4343): scans + connects. Driver builds wlan0; firmware = the shipped
+  bcmdhd_mfg.bin + nvram_4343.txt (works despite the "_mfg" name). Connect via SSH (no OSK to
+  type on the tablet): `sudo nmcli device wifi connect "<SSID>" password "<pw>"`. Got DHCP + internet.
+- **NetworkManager "not authorized to control networking"**: the tinydm auto-login session isn't
+  registered with elogind (`loginctl` = "No sessions"), so polkit denies NM control. Fix = polkit
+  rule granting the netdev group: /etc/polkit-1/rules.d/49-nm-netdev.rules
+  (polkit.addRule -> if action starts org.freedesktop.NetworkManager. && subject.isInGroup("netdev") return YES).
+- Passwordless sudo must be re-added per-rootfs: the lxqt image (userdata) is separate from the
+  console image, so `echo <pw> | sudo -S sh -c 'echo "user ALL=(ALL) NOPASSWD: ALL" > /etc/sudoers.d/99-nopw'`.
+- **On-screen keyboard (onboard) BROKEN — needs a kernel fix**: onboard (GTK) crashes with
+  `Gtk:ERROR ... Failed to load image-missing.svg: Memfd: cannot create a memfd`. Root cause:
+  gdk-pixbuf uses the **memfd_create() syscall (Linux >= 3.17)** to load icons; our kernel is 3.10
+  and lacks it -> ALL GTK apps that load SVG icons crash. Qt/LXQt is unaffected. THE FIX: backport
+  memfd_create into the 3.10 kernel (a real patch, not a config flip) -> fixes onboard + all GTK.
+  Best bundled with the Bluetooth kernel work. (Quick alt: a non-GTK X11 keyboard like xvkbd.)
+- Also broken by the missing session: XDG_RUNTIME_DIR empty, dconf writes fail. Deeper fix: make
+  tinydm/autologin create a proper elogind session (pam_elogind).
