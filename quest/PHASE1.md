@@ -31,6 +31,32 @@ Comms verified; only the stock firmware (recovery net) is left before flashing.
 - THEN flash: `pmbootstrap flasher flash_kernel` + `pmbootstrap flasher flash_rootfs`
   (device in download mode), then power on and watch for screen + console login.
 
+## Flashing reality (2026-07-24): heimdall is a DEAD END here — use odin4
+- **heimdall fails** the large SYSTEM upload at exactly **5%** with
+  `Failed to confirm end of file transfer sequence` — deterministic across heimdall
+  2.2.2 (pmbootstrap chroot), 2.0.2 (host apt), and 1.4.2 (extracted from Ubuntu deb),
+  and across multiple cables + USB2/USB3 ports. heimdall can handshake + read the PIT
+  but can't bulk-write large partitions to this Spreadtrum device. So `pmbootstrap
+  flasher flash_rootfs` (which uses the in-chroot heimdall) CANNOT work here.
+- A failed heimdall SYSTEM write leaves the tablet on the "Firmware upgrade encountered
+  an issue / use Kies" screen. **NOT a brick** — bootloader untouched, download mode
+  always reachable (Vol Down+Home+Power -> Vol Up). Recover by re-flashing.
+- **SOLUTION = odin4** (Samsung's OFFICIAL Linux Odin, v1.2.1). Installed to
+  `~/.local/bin/odin4` (binary from github Adrilaw/OdinV4 `odin.zip`). It flashed the
+  full stock firmware incl. the ~1GB `system.img` cleanly and rebooted to Android.
+  - Detect (non-destructive): `sudo ~/.local/bin/odin4 -l`  -> prints device path.
+  - Flash stock: `sudo odin4 -b BL.tar.md5 -a AP.tar.md5 -s CSC.tar.md5` (no CP; WiFi-only).
+  - USE FULL ABSOLUTE PATHS. An unset `$FW` var made it read nothing (md5 `d41d8cd...`).
+- **Device RECOVERED to working stock Android** with the samfw ZTO firmware in old-firmware/.
+
+### Next: flash pmOS via odin4 (NOT heimdall)
+odin4 flashes an Odin AP `.tar` (maps filename->partition via the PIT), not heimdall's
+`--PARTITION rawimage`. So package the pmOS images into an AP tar:
+  - `samsung-gtelwifi.img` -> renamed to the SYSTEM partition's flash filename (system.img)
+  - pmOS `boot.img` -> renamed to the kernel/boot partition's flash filename
+  `tar -H ustar -cf pmos.tar system.img boot.img`, then `sudo odin4 -a pmos.tar`.
+  (Confirm exact partition flash filenames from `heimdall print-pit` / the saved PIT.)
+
 ## Artifacts from Phase 0
 - rootfs: `~/.local/var/pmbootstrap/chroot_native/home/pmos/rootfs/samsung-gtelwifi.img`
 - kernel+initramfs: `~/.local/var/pmbootstrap/chroot_rootfs_samsung-gtelwifi/boot`
