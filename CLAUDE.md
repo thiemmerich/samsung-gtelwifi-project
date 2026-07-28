@@ -171,11 +171,35 @@ to the public repo). Facts:
      `HYBRIS_LD_LIBRARY_PATH=/system/lib:/vendor/lib`;
      `LD_LIBRARY_PATH=<build>/{egl,glesv2,common,hardware,properties,libsync,egl/platforms/fbdev}/.libs`;
      `EGL_PLATFORM=fbdev`; run `tests/.libs/test_egl_configs`. (Runs as user after the chmod.)
-   - ⚠️ **REMAINING (next session): `eglGetConfigs` returns `EGL_NOT_INITIALIZED` (0x3001)** at
-     test_egl_configs.c:106 — the classic libhybris fbdev config-enumeration hurdle. eglInitialize
-     works but the config query fails → likely a libhybris fbdev EGL wrapper / display-handle issue.
-     Must fix to get a config → context → surface → actual rendering (glmark2-es2). Debug with
-     `HYBRIS_TRACE=1`/`EGL_LOG_LEVEL`; compare `test_egl` (uses eglChooseConfig) behavior.
+   - 🔬 **RUNTIME DEBUG PROGRESS (2026-07-28, session 2):** The `EGL_NOT_INITIALIZED` was a
+     side-effect of gralloc loading the WRONG module. Root fixes applied so far (all improved things):
+     1. **Stage `/system/build.prop`** (extract `/build.prop` from system.raw). It has
+        `ro.board.platform=sc8830` → the HAL now loads the CORRECT **`gralloc.sc8830.so`** (not
+        `gralloc.default.so`). `sudo chmod 666 /dev/ion /dev/mali0 /dev/fb0`.
+     2. **Hooked `__android_log_print/_vprint/_write/_assert`** in hooks.c (routed to stderr) — the
+        blobs' logging was falling through to bionic `liblog` → bionic mutex → crash. NOW WE SEE THE
+        BLOB'S OWN LOG: `[droid:libEGL] loaded libGLES_mali.so`, `[droid:[Gralloc]] sprdfb 800x1280
+        bpp=32` — **gralloc FULLY initializes the sprdfb framebuffer** (even sets 32bpp RGBA!).
+     3. Hooked fortify `__*_chk` + C++ `_Znwj/_ZdlPv` (new/delete→malloc/free). (Both hook patches
+        saved: `hybris/musl-port/patch_androidlog.py`, `patch2_hooks.py` — idempotent, re-appliable.)
+   - ⚠️ **REMAINING (the wall): bionic-libc COEXISTENCE.** Crash persists at bionic
+     `pthread_mutex_init` (PC `0xb6c9a7c4`, deref `0x20`), reached via `gralloc.sc8830 → bionic libc`.
+     Cause: the blobs call bionic libc functions libhybris doesn't hook; with bionic `libc.so` loaded
+     they run bionic code that touches **bionic TLS/`pthread_internal_t`** which is null on our thread
+     → deref 0x20. (Removing bionic libc instead → null-dispatch crash in libEGL: hooks incomplete.)
+   - **➡️ NEXT-SESSION STRATEGY (root fix, not whack-a-mole):** the deref-0x20 = the thread's bionic
+     TLS slot (`TLS_SLOT_THREAD_ID` → pthread_internal_t) is unset. **Investigate libhybris's bionic
+     main-thread TLS setup** (jb linker `__libc_init_tls`/`__init_tls`/`init_tls`/`__set_tls`); if the
+     musl port didn't wire up the main thread's bionic TLS, fixing THAT once resolves ALL these
+     bionic-TLS crashes at once — far better than hooking each function. Tool: rebuild libhybris with
+     `--enable-trace --enable-debug` + `HYBRIS_TRACE=1` to log the exact call sequence. Static gap
+     list (unhooked blob imports) in this session's notes: ion_*, hw_get_module, sem_*, sync_wait,
+     android_atomic_*, __aeabi_*, close/dup/ioctl/clock_gettime, etc.
+   - **RUNTIME ENV (updated):** `sudo chmod 666 /dev/mali0 /dev/ion /dev/fb0`; `/system/build.prop`
+     staged; `HYBRIS_LD_LIBRARY_PATH=/system/lib:/vendor/lib`; `LD_LIBRARY_PATH=<build>/{egl,glesv2,
+     common,hardware,properties,libsync,egl/platforms/fbdev}/.libs`; `EGL_PLATFORM=fbdev`. Diagnostics:
+     `strace -f`, `gdb -batch -ex run -ex "info proc mappings"` (blobs have no symbols; map PC→lib by
+     range; resolve bionic offsets via `readelf -sW` on libc.so extracted from system.raw).
    - **STILL TODO after that:** wire GL into the LXQt/X11 desktop via patch `0002` (X11 EGL platform,
      needs xcb-drihybris + a bit more) OR keep fbdev for fullscreen GL apps. Package the whole thing as
      the `hybris/libhybris` + `hybris/android-headers` aports (drafts in `hybris/`, add the musl-port
