@@ -13,5 +13,9 @@
 *.tar.gz
 *.zip
 
+# EXCEPTION: the Mali GPU driver source tarball IS ours to vendor (small, GPL, required by
+# setup-pmaports.sh + patches/0002). Keep it tracked despite the *.tar.gz rule above.
+!/vendor/mali-utgard-sc8830-r4p1.tar.gz
+
 # OS cruft
 .DS_Store

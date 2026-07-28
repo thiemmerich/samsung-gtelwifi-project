@@ -34,6 +34,33 @@ so a wrong/corrupt mirror would be caught.
   …/releases/download/vendor-sources/firmware-config-63c2705.tar.gz
   ```
 
+## Committed directly in this repo (small, so no Release needed)
+- **`vendor/mali-utgard-sc8830-r4p1.tar.gz`** (242 KB) — the Mali-400 Utgard **kernel** driver
+  (`drivers/gpu/mali/`, 148 files, GPL-2.0). Extracted from
+  `github.com/codeworkx/android_kernel_samsung_gtelwifi` branch `cm-11.0`, commit
+  `60871e9801b01f445fb184362a9976c1807ff289`. Factory-matched to the stock KitKat `libGLES_mali.so`
+  r4p1 userspace blob. `setup-pmaports.sh` copies it into the kernel aport dir, where the APKBUILD
+  (patched by `patches/0002-mali-gpu-driver.patch`) consumes it as a local source.
+  ```
+  de6bb31b921bb201fdb0a7fa94f5064e776adf97c1de5200f64f07a1b4f87d3695379b63e6b1e3e81c65eb1e935471d6d6df7be5e56bd86f88571757338a7490  mali-utgard-sc8830-r4p1.tar.gz
+  ```
+  (NOTE: the proprietary **userspace** GPU blobs — `libGLES_mali.so` etc. — are NOT committed; they
+  live only in `~/pmos-odin/gpu/blobs/`. They're for the upcoming libhybris step, and are ARM/Samsung
+  proprietary, so they must never go in this public repo.)
+
+## libhybris musl-port patches (in `hybris/musl-port/`)
+For the GPU-userspace step (see `../CLAUDE.md` "THE ULTIMATE HACK"):
+- `0001-Make-libhybris-compile-with-musl.patch`, `0002-Implement-X11-EGL-platform-based-on-wayland-code.patch`
+  — pmOS's libhybris musl + X11-EGL patches, recovered from the (now-removed-upstream) pmaports
+  `hybris/libhybris` aport as preserved in the fork **`Linux-On-Sdm6Series/pmaports@halium9`**. They
+  apply to **libhybris commit `1b6090ad6e420fe2139685e0af54fd94edb7d049`** (pmOS pkgver `1.0_git20200504`).
+- `linux-sync.h`, `linux-sw_sync.h` — minimal Android sync-framework UAPI (dropped from modern
+  linux-headers); install to `/usr/include/linux/` to build libhybris `libsync`.
+- `hybris_musl_compat.h` — earlier hand-port scratch header (superseded by 0001; kept for reference).
+NOTE: the proprietary Android GPU **userspace blobs** (`libGLES_mali.so` etc.) are NOT vendored here
+(ARM/Samsung proprietary) — they live only in `~/pmos-odin/gpu/blobs/` + are re-extractable from
+`old-firmware/`'s `system.img` with `scripts/unsparse.py` + `debugfs`.
+
 ## Deliberately NOT vendored
 - **Alpine/pmOS base binary packages** — rolling edge, hundreds of MB, replaceable. If they
   404, refresh with `pmbootstrap update` (see quest/PHASE0.md).

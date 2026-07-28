@@ -32,5 +32,16 @@ if ls "$PATCHDIR"/*.patch >/dev/null 2>&1; then
 	done
 fi
 
+# Place the vendored Mali GPU driver tarball into the kernel aport dir. It's a LOCAL source in
+# the linux-samsung-gtelwifi APKBUILD (see patches/0002-mali-gpu-driver.patch) — a binary that
+# can't live in a git-apply patch. Provenance + sha512 in vendor/SOURCES.md.
+MALI_TARBALL="$(cd "$(dirname "$0")/.." && pwd)/vendor/mali-utgard-sc8830-r4p1.tar.gz"
+if [ -f "$MALI_TARBALL" ]; then
+	echo "Placing Mali driver tarball into the kernel aport dir ..."
+	cp "$MALI_TARBALL" "$DEST/device/downstream/linux-samsung-gtelwifi/"
+else
+	echo "WARNING: $MALI_TARBALL missing — GPU kernel build will fail checksum. See vendor/SOURCES.md."
+fi
+
 echo "Done. Device package: device/downstream/device-samsung-gtelwifi"
 echo "Kernel package:  device/downstream/linux-samsung-gtelwifi (3.10.17 fork)"

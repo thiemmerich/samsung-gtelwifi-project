@@ -1,0 +1,32 @@
+# Contributor: gtelwifi quest
+# Maintainer: gtelwifi quest
+#
+# Android userspace headers for libhybris, targeting KitKat / API 19 (our stock blobs).
+# libhybris compiles against these and derives the target Android version (→ which bundled
+# linker era, hybris/common/jb for us) from them.
+# DRAFT skeleton — the SOURCE REF IS THE MAIN OPEN ITEM (see below).
+pkgname=android-headers
+# TODO: pin to an API-19 / KitKat-compatible ref. Candidates:
+#   (a) mer-hybris/android-headers at a 4.4- or JB-era branch/tag (classic Sailfish source), OR
+#   (b) generate from an AOSP 4.4 tree with libhybris utils/extract-headers.sh <tree> 19.
+# Chimera uses Halium/android-headers @ halium-11.0 — Android 11, TOO NEW for our KitKat blobs.
+pkgver=4.4_TODO
+_commit=TODO
+pkgdesc="Android userspace headers (API 19 / KitKat) for libhybris"
+url="https://github.com/mer-hybris/android-headers"
+arch="noarch"
+license="Apache-2.0"
+options="!check"   # headers only
+makedepends=""
+source="$pkgname-$_commit.tar.gz::https://github.com/mer-hybris/android-headers/archive/$_commit.tar.gz"
+builddir="$srcdir/android-headers-$_commit"
+
+package() {
+	# The repo installs headers under $PREFIX/include/android and drops a pkg-config file.
+	# libhybris' configure finds them via --with-android-headers=/usr/include/android (or pkgconfig).
+	make DESTDIR="$pkgdir" PREFIX=/usr install
+	# TODO: confirm the installed android-version.h reports API 19 so libhybris picks the jb linker.
+}
+
+# TODO: sha512sums once _commit is pinned (sha512sum the tarball; pmbootstrap checksum is headless-broken)
+sha512sums=""

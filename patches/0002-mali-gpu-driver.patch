@@ -1,0 +1,81 @@
+diff --git a/device/downstream/linux-samsung-gtelwifi/APKBUILD b/device/downstream/linux-samsung-gtelwifi/APKBUILD
+index 64c5bdb55..a25c4b7fc 100644
+--- a/device/downstream/linux-samsung-gtelwifi/APKBUILD
++++ b/device/downstream/linux-samsung-gtelwifi/APKBUILD
+@@ -4,7 +4,7 @@
+ maintainer=""
+ pkgname=linux-samsung-gtelwifi
+ pkgver=3.10.17
+-pkgrel=7
++pkgrel=8
+ pkgdesc="Samsung Galaxy Tab E 9.6 kernel fork"
+ arch="armv7"
+ _carch="arm"
+@@ -31,12 +31,27 @@ source="
+ 	fix-dtb_qcom-msm-id.patch
+ 	sprdfb-check-for-buffering.patch
+ 	sprdfb-fix-swapped-colors.patch
++	mali-utgard-sc8830-r4p1.tar.gz
+ "
+ builddir="$srcdir/$_repository-$_commit"
+ _outdir="out"
+ 
+ prepare() {
+ 	default_prepare
++
++	# --- Mali-400 Utgard GPU driver (sc8830 platform, r4p1) ---
++	# From codeworkx/android_kernel_samsung_gtelwifi @ cm-11.0 (commit 60871e9801b0);
++	# factory-matched to the stock libGLES_mali.so r4p1 blob. Injected here because the
++	# pmsourcedump tree was stripped of drivers/gpu/mali. See CLAUDE.md "THE ULTIMATE HACK".
++	# MUST run BEFORE downstreamkernel_prepare: that does `make oldconfig`, which would drop
++	# CONFIG_MALI400=y as an unknown symbol unless mali/Kconfig is already sourced.
++	cp -r "$srcdir"/mali "$builddir"/drivers/gpu/mali
++	# hook into the gpu build (mirror codeworkx's integration)
++	grep -q ' mali/' "$builddir"/drivers/gpu/Makefile || \
++		sed -i 's|^\(obj-y.*sprd_iommu/\)|\1 mali/|' "$builddir"/drivers/gpu/Makefile
++	grep -q 'gpu/mali/Kconfig' "$builddir"/drivers/Kconfig || \
++		sed -i '\|^source "drivers/video/Kconfig"|a source "drivers/gpu/mali/Kconfig"' "$builddir"/drivers/Kconfig
++
+ 	. downstreamkernel_prepare
+ }
+ 
+@@ -56,7 +71,7 @@ package() {
+ 
+ sha512sums="
+ 1d951c9e33d79250513665a617867816d81df866e869ba20664c9f4b2f05845e6ff7c667ba0ef11f9287109e6716d1b45164848a750e36202c4f95665759a2aa  linux-samsung-gtelwifi-e81e8d5094db8f10ff44cc95f55939c90df35e51.tar.gz
+-976682e0da6b4c5dc3022ecd1e90ef5f84fa90c5ec0b55499c42060162563ce70ef4b9de94cdb892dc29689a268ed5c0b3a3fd1bc107be076390352d43662fc7  config-samsung-gtelwifi.armv7
++939b956987d5a2cea9f85a78ff04e03337f3336cb0c4932a8a08b06ca59efc941b0ce15f76235f1f06091b6422dfce4fd02d9a0fb615b76d018a3e0f6a69a8f0  config-samsung-gtelwifi.armv7
+ 77eba606a71eafb36c32e9c5fe5e77f5e4746caac292440d9fb720763d766074a964db1c12bc76fe583c5d1a5c864219c59941f5e53adad182dbc70bf2bc14a7  gcc7-give-up-on-ilog2-const-optimizations.patch
+ 197d40a214ada87fcb2dfc0ae4911704b9a93354b75179cd6b4aadbb627a37ec262cf516921c84a8b1806809b70a7b440cdc8310a4a55fca5d2c0baa988e3967  gcc8-fix-put-user.patch
+ 2b48f1bf0e3f70703d2cdafc47d5e615cc7c56c70bec56b2e3297d3fa4a7a1321d649a8679614553dde8fe52ff1051dae38d5990e3744c9ca986d92187dcdbeb  gcc10-extern_YYLOC_global_declaration.patch
+@@ -67,4 +82,5 @@ ad0182a483791fc88e058838bc331b2f04a75ba291e763767babdb815efadfc3b4fda97e69e2e3f0
+ e8137de3cc4d49d5447cad6c299f0f88c2d2e60e012168bc857f4898ebc1da5c88c679927227c8675211af079d5a56b5b1baef4a3dbc86cb4e921c14d3f93357  fix-dtb_qcom-msm-id.patch
+ c985b4a320904c0c66fb976a4f66dd2671f21d7b86ea98c019684efc41b5801f4b9c23012f4aa37bc5ce3efd70a30523c9c78fcd6e5fbbcff172ff19d11a6579  sprdfb-check-for-buffering.patch
+ 6836001b24508d413a059f19b0c6f6f547037f68886c22159ad51be91d1a089e3d1d9ed79c3c62724648df7f810cd81d96a83f4a34368b373524b649e5539656  sprdfb-fix-swapped-colors.patch
++de6bb31b921bb201fdb0a7fa94f5064e776adf97c1de5200f64f07a1b4f87d3695379b63e6b1e3e81c65eb1e935471d6d6df7be5e56bd86f88571757338a7490  mali-utgard-sc8830-r4p1.tar.gz
+ "
+diff --git a/device/downstream/linux-samsung-gtelwifi/config-samsung-gtelwifi.armv7 b/device/downstream/linux-samsung-gtelwifi/config-samsung-gtelwifi.armv7
+index 68f883f05..493d83f04 100644
+--- a/device/downstream/linux-samsung-gtelwifi/config-samsung-gtelwifi.armv7
++++ b/device/downstream/linux-samsung-gtelwifi/config-samsung-gtelwifi.armv7
+@@ -2100,6 +2100,20 @@ CONFIG_ION=y
+ CONFIG_ION_SPRD=y
+ CONFIG_SPRD_IOMMU=y
+ # CONFIG_SPRD_IOMMU_DEBUG is not set
++# Mali-400 Utgard GPU driver (sc8830) — values from gtelwifi-dt_hw07_defconfig (codeworkx)
++CONFIG_MALI400=y
++CONFIG_MALI_PLATFORM_SC8830=y
++# CONFIG_MALI450 is not set
++# CONFIG_MALI400_DEBUG is not set
++# CONFIG_MALI_PERF_DEBUG_TRACE is not set
++CONFIG_MALI400_PROFILING=y
++# CONFIG_MALI400_INTERNAL_PROFILING is not set
++# CONFIG_MALI400_UMP is not set
++# CONFIG_MALI400_POWER_PERFORMANCE_POLICY is not set
++CONFIG_MALI_DMA_BUF_MAP_ON_ATTACH=y
++CONFIG_MALI_SHARED_INTERRUPTS=y
++# CONFIG_MALI_PMU_PARALLEL_POWER_UP is not set
++# CONFIG_MALI_QUIET is not set
+ # CONFIG_VGASTATE is not set
+ # CONFIG_VIDEO_OUTPUT_CONTROL is not set
+ CONFIG_FB=y

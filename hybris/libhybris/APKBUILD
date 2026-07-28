@@ -1,0 +1,51 @@
+# Contributor: gtelwifi quest
+# Maintainer: gtelwifi quest
+#
+# libhybris for the CLASSIC bare-metal model (see ../README.md): real bundled bionic
+# linker (NOT --enable-stub-linker), fbdev EGL backend, Mali-400 quirks, KitKat/API-19.
+# DRAFT skeleton — not yet build-verified. Builds under qemu-armv7 (no cross-native).
+pkgname=libhybris
+pkgver=0.1.0_git20241107
+# libhybris master @ this commit (same as Chimera's reference; supports Android 2.3-13 → API 19
+# via the hybris/common/jb linker). TODO: if the jb path misbehaves on KitKat, try an older
+# mer-hybris tag from the 4.x era.
+_commit=9f61f26c44d9a3bf62efb67d4c32a7a0c89c21ca
+pkgdesc="Bionic-based HW adaptation compat layer (classic bare-metal, Mali-400/KitKat)"
+url="https://github.com/libhybris/libhybris"
+arch="armv7"
+license="Apache-2.0"
+# android-headers gives the Android version macros + HAL/EGL/cutils/window headers libhybris
+# compiles against; it also decides the linker era. See ../android-headers.
+makedepends="autoconf automake libtool pkgconf linux-headers android-headers"
+subpackages="$pkgname-dev $pkgname-tests"
+source="$pkgname-$_commit.tar.gz::https://github.com/libhybris/libhybris/archive/$_commit.tar.gz"
+builddir="$srcdir/libhybris-$_commit/hybris"   # configure.ac lives in the hybris/ subdir
+
+build() {
+	./autogen.sh 2>/dev/null || autoreconf -fi
+	# CLASSIC bare-metal flags. Deliberately: NO --enable-stub-linker, NO --enable-wayland.
+	./configure \
+		--build="$CBUILD" \
+		--host="$CHOST" \
+		--prefix=/usr \
+		--sysconfdir=/etc \
+		--enable-arch=arm \
+		--with-default-egl-platform=fbdev \
+		--enable-mali-quirks \
+		--with-android-headers=/usr/include/android \
+		--with-default-hybris-ld-library-path=/vendor/lib:/system/lib:/system/vendor/lib
+	make
+}
+
+package() {
+	make DESTDIR="$pkgdir" install
+}
+
+tests() {
+	# hybris test binaries (test_hardware/test_egl/test_glesv2) for on-device bring-up.
+	depends="$pkgname"
+	amove usr/bin/test_*
+}
+
+# TODO: sha512sums (generate with `sha512sum` per repo gotcha #7 — pmbootstrap checksum is headless-broken)
+sha512sums=""
