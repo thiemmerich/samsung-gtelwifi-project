@@ -10,7 +10,25 @@ Spreadtrum SC7730, armv7)** by gluing the postmarketOS reverse-engineered **down
 Raspberry-Pi-OS port (Broadcom kernel can't move) — it's kernel-glue + a Debian-family
 rootfs. End goal: **Devuan (no systemd) + LXDE**, Windows-like feel. See `quest/ROADMAP.md`.
 
-## STATUS (2026-07-28) — BOOTS + SSH + DISPLAY all WORK ✅✅✅
+## STATUS (2026-07-28) — LXQt DESKTOP + TOUCH WORK 🎉 (quest complete)
+- Full **LXQt desktop** (pmOS `ui=lxqt`, tablet build) runs on the panel, **driven by the
+  touchscreen**; battery/power-manager read fine. Software-rendered X on sprdfb (no GPU) — pokey but usable.
+- It lives on **userdata** (mmcblk0p26, 5.4 GB): the lxqt rootfs (1.9 GB) is too big for the
+  1.5 GB SYSTEM partition, so we `dd`'d it onto userdata over SSH and boot from there.
+- Console image still on SYSTEM (mmcblk0p23) as fallback.
+
+### ⚠️⚠️ BIGGEST GOTCHA (learned the hard way): the bootloader IGNORES the boot.img cmdline
+`/proc/cmdline` is the Spreadtrum bootloader's OWN hardcoded string (`mem=... init=/init
+androidboot.bootloader=... console=null`). Our boot.img `pmos_root_uuid=` / `pmos.debug-shell`
+/ etc. are **never passed**. Consequences:
+- **Root is selected ONLY by the ext4 LABEL `pmOS_root`** (the initramfs scans for it). UUID
+  pairing and cmdline edits have ZERO effect. Flashing a different boot.img changes nothing but the kernel/initrd blob.
+- So **exactly ONE partition may be labeled `pmOS_root`.** With two rootfs (SYSTEM=console,
+  userdata=lxqt) both labeled pmOS_root, it booted the first (SYSTEM). Fix: relabel the others:
+  `sudo tune2fs -L pmOS_console /dev/mmcblk0p23` → only userdata is pmOS_root → boots lxqt.
+- To switch which rootfs boots: just move the `pmOS_root` label (tune2fs -L), no reflash needed.
+
+## STATUS (earlier 2026-07-28) — BOOTS + SSH + DISPLAY all WORK ✅✅✅
 - Kernel `3.10.17 #N-postmarketOS` runs; `/` (pmOS_root) mounted rw; services up;
   **`ssh user@172.16.42.1` works**; **the console renders on the panel** (login prompt visible).
 - Display was NOT a color/geometry bug: `# CONFIG_FRAMEBUFFER_CONSOLE is not set` (only a

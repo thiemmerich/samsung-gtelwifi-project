@@ -148,3 +148,25 @@ getty rendered to a void and the splash stayed on screen. Fix: `CONFIG_FRAMEBUFF
 + `CONFIG_FRAMEBUFFER_CONSOLE_DETECT_PRIMARY=y` + `CONFIG_FONT_8x16=y`, rebuild -> tablet shows
 `samsung-gtelwifi login:` on its own screen. THE CORE QUEST IS DONE: boots + SSH + display.
 On-device typing needs a USB-OTG keyboard or (Phase 4) an on-screen keyboard; SSH works today.
+
+## LXQt DESKTOP + TOUCH working (2026-07-28) — QUEST COMPLETE 🎉
+Got a full touch-driven LXQt desktop on the tablet. Path:
+- `pmbootstrap config ui lxqt` (pmOS has no LXDE; lxqt IS LXDE's successor, and pmOS's is the
+  tablet build: tinydm auto-login + onboard OSK). Build with the X drivers baked in:
+  `pmbootstrap -y install --split --password bucica --add xf86-video-fbdev,xf86-input-libinput,xf86-input-evdev`
+- **Touchscreen works**: kernel detects `sec_touchscreen` on /dev/input/event3 (INPUT_PROP_DIRECT,
+  ABS axes). Accelerometer + hw keys also present.
+- **X needs an fbdev config** (sprdfb has no DRM/KMS): /etc/X11/xorg.conf.d/10-fbdev.conf ->
+  Driver "fbdev", Option "fbdev" "/dev/fb0"; + 99-touch.conf routing libinput. (See ~/pmos-odin/xorgfix/.)
+- **Too big for SYSTEM**: lxqt rootfs = 1618 MiB used > 1500 MiB SYSTEM. Solution: `dd` the fixed
+  rootfs image onto the 5.4 GB `userdata` partition (mmcblk0p26) over SSH:
+  `dd if=root-lxqt.img bs=4M | ssh tablet 'sudo dd of=/dev/mmcblk0p26 bs=4M conv=fsync'`
+  (enable passwordless sudo on the tablet first). initramfs resizes the fs to fill userdata.
+- **THE trap**: the Spreadtrum bootloader ignores the boot.img cmdline entirely, so root is chosen
+  by ext4 LABEL `pmOS_root` only. Both SYSTEM (console) and userdata (lxqt) were labeled pmOS_root
+  -> it booted SYSTEM. Fix: `sudo tune2fs -L pmOS_console /dev/mmcblk0p23` so only userdata is
+  pmOS_root -> reboots into lxqt. (See CLAUDE.md "BIGGEST GOTCHA".)
+
+Result: LXQt desktop on the panel, opened Power Management via touch, battery reads 53%. The
+2015 Galaxy Tab E runs a real Linux desktop. Next (tomorrow): Bluetooth (enable CONFIG_BT +
+BT_HIDP in kernel, then Broadcom-over-UART bring-up) for wireless mouse/keyboard.
