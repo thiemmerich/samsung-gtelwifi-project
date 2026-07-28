@@ -1,0 +1,96 @@
+diff --git a/device/downstream/device-samsung-gtelwifi/APKBUILD b/device/downstream/device-samsung-gtelwifi/APKBUILD
+index f6849d7bc..fc4664ed6 100644
+--- a/device/downstream/device-samsung-gtelwifi/APKBUILD
++++ b/device/downstream/device-samsung-gtelwifi/APKBUILD
+@@ -3,7 +3,7 @@ maintainer=""
+ pkgname=device-samsung-gtelwifi
+ pkgdesc="Samsung Galaxy Tab E 9.6"
+ pkgver=2
+-pkgrel=0
++pkgrel=1
+ url="https://postmarketos.org"
+ license="MIT"
+ arch="armv7"
+@@ -30,5 +30,5 @@ nonfree_firmware() {
+ 
+ sha512sums="
+ 60682687b10db943d246cf9693b4eaa4a084de5b798a62a2469a486ebf7d76e3e4bebc46565225d28e36eaa5e9dece4034791f8d7fe777fcb0fdafaa3516c533  deviceinfo
+-cb0731b5e71b427024bb47cd70aa48d3be409a89aa476f3fd4dea8e5b42ef87371a65bbe836bca7da04c0384178ad293b44da8a88557ad04fc57857bef502050  kernel-cmdline.conf
++56eee44bc4a3af1059994c7c3b0d13e3dc5a7f88e079ea0d8639c57944e2e6ae7b8e23564233342b0a330b782983b21340829041fbc6f97dee9820b341f9a107  kernel-cmdline.conf
+ "
+diff --git a/device/downstream/device-samsung-gtelwifi/kernel-cmdline.conf b/device/downstream/device-samsung-gtelwifi/kernel-cmdline.conf
+index d94a03704..b74b8aa04 100644
+--- a/device/downstream/device-samsung-gtelwifi/kernel-cmdline.conf
++++ b/device/downstream/device-samsung-gtelwifi/kernel-cmdline.conf
+@@ -1 +1 @@
+-buildvariant=userdebug
++buildvariant=userdebug pmos.debug-shell
+diff --git a/device/downstream/linux-samsung-gtelwifi/APKBUILD b/device/downstream/linux-samsung-gtelwifi/APKBUILD
+index 2c728bc07..2eb5d3a81 100644
+--- a/device/downstream/linux-samsung-gtelwifi/APKBUILD
++++ b/device/downstream/linux-samsung-gtelwifi/APKBUILD
+@@ -4,7 +4,7 @@
+ maintainer=""
+ pkgname=linux-samsung-gtelwifi
+ pkgver=3.10.17
+-pkgrel=5
++pkgrel=6
+ pkgdesc="Samsung Galaxy Tab E 9.6 kernel fork"
+ arch="armv7"
+ _carch="arm"
+@@ -28,7 +28,7 @@ source="
+ 	linux3.0-8933-1-replace-Sun-Solaris-style-flag-on-section.patch
+ 	linux3.4-fix-piggy.gzip.S.patch
+ 	fix-recordmcount.patch
+-	fix-dtb_qcom,msm-id.patch
++	fix-dtb_qcom-msm-id.patch
+ 	sprdfb-check-for-buffering.patch
+ 	sprdfb-fix-swapped-colors.patch
+ "
+@@ -56,7 +56,7 @@ package() {
+ 
+ sha512sums="
+ 1d951c9e33d79250513665a617867816d81df866e869ba20664c9f4b2f05845e6ff7c667ba0ef11f9287109e6716d1b45164848a750e36202c4f95665759a2aa  linux-samsung-gtelwifi-e81e8d5094db8f10ff44cc95f55939c90df35e51.tar.gz
+-f25a8ed914371359f3dd0a85e112acca3e3831531576b30411ec7c90c48687e425b3c0b496ebdc9da38f632dbf49af1660302f8daad68aee2838b55624b3f408  config-samsung-gtelwifi.armv7
++13f170c7123bdb906c4e42463e606534e64c8ea25d107dca8aed22c7cb10a48a9aed5c0aee5eab0963395a844142198ff59225da6f8c273b336897767405493a  config-samsung-gtelwifi.armv7
+ 77eba606a71eafb36c32e9c5fe5e77f5e4746caac292440d9fb720763d766074a964db1c12bc76fe583c5d1a5c864219c59941f5e53adad182dbc70bf2bc14a7  gcc7-give-up-on-ilog2-const-optimizations.patch
+ 197d40a214ada87fcb2dfc0ae4911704b9a93354b75179cd6b4aadbb627a37ec262cf516921c84a8b1806809b70a7b440cdc8310a4a55fca5d2c0baa988e3967  gcc8-fix-put-user.patch
+ 2b48f1bf0e3f70703d2cdafc47d5e615cc7c56c70bec56b2e3297d3fa4a7a1321d649a8679614553dde8fe52ff1051dae38d5990e3744c9ca986d92187dcdbeb  gcc10-extern_YYLOC_global_declaration.patch
+@@ -64,7 +64,7 @@ ad0182a483791fc88e058838bc331b2f04a75ba291e763767babdb815efadfc3b4fda97e69e2e3f0
+ 66ab793bb1fa50a07f10e2cdb0f49ea05a787c6b1fe5358e69a76e43295ac5be3b68cdf6a882e868bfe6969cac981c5545587cd57eee4b5cec26078ae0ecaa1c  linux3.0-8933-1-replace-Sun-Solaris-style-flag-on-section.patch
+ 080745ca4ecaa804ee1df26ea81975ca93b74372e0c08322a6c481e97807495ae6ceb6cc77653afa24f9f2df45da8ebf8e5de6b06037fbb08e0279877ce42188  linux3.4-fix-piggy.gzip.S.patch
+ 32911549f0c89972d06af838954978ee90fb2eabacc1393c0bffa12deb9d80ddec5322f859df772d90afea733965bd669e85d5e90657d4f69995ae9fc25dd4f3  fix-recordmcount.patch
+-e8137de3cc4d49d5447cad6c299f0f88c2d2e60e012168bc857f4898ebc1da5c88c679927227c8675211af079d5a56b5b1baef4a3dbc86cb4e921c14d3f93357  fix-dtb_qcom,msm-id.patch
++e8137de3cc4d49d5447cad6c299f0f88c2d2e60e012168bc857f4898ebc1da5c88c679927227c8675211af079d5a56b5b1baef4a3dbc86cb4e921c14d3f93357  fix-dtb_qcom-msm-id.patch
+ c985b4a320904c0c66fb976a4f66dd2671f21d7b86ea98c019684efc41b5801f4b9c23012f4aa37bc5ce3efd70a30523c9c78fcd6e5fbbcff172ff19d11a6579  sprdfb-check-for-buffering.patch
+ 6836001b24508d413a059f19b0c6f6f547037f68886c22159ad51be91d1a089e3d1d9ed79c3c62724648df7f810cd81d96a83f4a34368b373524b649e5539656  sprdfb-fix-swapped-colors.patch
+ "
+diff --git a/device/downstream/linux-samsung-gtelwifi/config-samsung-gtelwifi.armv7 b/device/downstream/linux-samsung-gtelwifi/config-samsung-gtelwifi.armv7
+index fefca331d..a90f5cd9b 100644
+--- a/device/downstream/linux-samsung-gtelwifi/config-samsung-gtelwifi.armv7
++++ b/device/downstream/linux-samsung-gtelwifi/config-samsung-gtelwifi.armv7
+@@ -547,7 +547,7 @@ CONFIG_MIN_DIRTY_THRESH_PAGES=2560
+ CONFIG_FORCE_MAX_ZONEORDER=11
+ CONFIG_ALIGNMENT_TRAP=y
+ # CONFIG_UACCESS_WITH_MEMCPY is not set
+-# CONFIG_SECCOMP is not set
++CONFIG_SECCOMP=y
+ # CONFIG_CC_STACKPROTECTOR is not set
+ # CONFIG_XEN is not set
+ CONFIG_ARM_FLUSH_CONSOLE_ON_RESTART=y
+diff --git a/device/downstream/linux-samsung-gtelwifi/fix-dtb_qcom,msm-id.patch b/device/downstream/linux-samsung-gtelwifi/fix-dtb_qcom-msm-id.patch
+similarity index 100%
+rename from device/downstream/linux-samsung-gtelwifi/fix-dtb_qcom,msm-id.patch
+rename to device/downstream/linux-samsung-gtelwifi/fix-dtb_qcom-msm-id.patch
+diff --git a/deviceinfo_schema.toml b/deviceinfo_schema.toml
+index 0f90e40e0..12db306e1 100644
+--- a/deviceinfo_schema.toml
++++ b/deviceinfo_schema.toml
+@@ -266,6 +266,7 @@ description = "Additional custom arguments to pass to mkbootimg. Caution: adding
+ 
+ [variable.flash.header_version]
+ description = "Header version of boot image as defined by Android documentation."
++datatype = "integer"
+ integer_interval = "[0, 4]"
+ 
+ [variable.flash.generate_bootimg]

@@ -95,3 +95,47 @@ reachable). That's why Rule 0 comes first.
 ## Exit criterion
 Tablet boots our pmOS image to a usable console with the screen working. Then
 Phase 2 (full hardware inventory) and later Phase 3 (swap to Devuan).
+
+## SSH / boot CRACKED — postmarketOS running with working SSH (2026-07-28)
+After getting the rootfs flashed (via odin4, below), the system booted but sshd
+reset every connection before its banner. Root cause chain, found by shipping a
+boot-time diagnostic script that phoned home over the USB net (nc to host:9999):
+1. **NOT host keys, NOT PAM alone.** sshd's `-ddde` trace showed the real killer:
+   `ssh_sandbox_child: prctl(PR_SET_SECCOMP): Invalid argument` -> preauth child
+   killed on every connect. OpenSSH 10.x's seccomp sandbox is mandatory/compiled-in.
+2. **The kernel advertises `CONFIG_HAVE_ARCH_SECCOMP_FILTER=y` but Samsung shipped
+   `# CONFIG_SECCOMP is not set`.** The 3.10 kernel CAN do seccomp; the vendor just
+   disabled it. THE FIX: set `CONFIG_SECCOMP=y`, bump kernel pkgrel, re-checksum,
+   rebuild. (Captured in patches/0001-gtelwifi-quest-fixes.patch.)
+3. Two real edge-snapshot bugs also had to be patched into the rootfs offline:
+   - `/etc/pam.d/sshd` includes `base-{auth,account,password,session}` which DON'T
+     EXIST in the image -> create them (all pam_* modules are present).
+   - `/etc/fstab` lists a `/boot` mount for a partition we don't flash -> drop it.
+
+Result: `ssh user@172.16.42.1` works. Confirmed inside: kernel 3.10.17 #7-postmarketOS,
+`/` = /dev/mmcblk0p23 (pmOS_root) mounted rw, all core services up. **It's a Linux tablet.**
+
+## The WORKING flash recipe (heimdall is a dead end; odin4 only)
+pmbootstrap's `flasher` uses heimdall, which fails at 5% on this device. Instead:
+1. Build split images: `pmbootstrap -y install --split`
+   -> chroot_native/home/pmos/rootfs/samsung-gtelwifi-{boot,root}.img (bare ext4, no MBR).
+2. Patch root.img offline (debugfs): drop /boot from fstab, add PAM base-* files,
+   inject SSH host keys + authorized_keys (uid/gid 10000). fsck -fn to verify.
+3. Convert root.img -> Samsung-style sparse `system.img` (see scripts/mksparse.py logic):
+   MUST match stock geometry: file_hdr=32, chunk_hdr=16, blk=4096, total_blks=384000
+   (= full 1.5G SYSTEM partition; pad with a DONT_CARE chunk), RAW+DONT_CARE only,
+   NO FILL chunks. img2simg's default (28/12 headers, FILL chunks, image-sized) is REJECTED.
+4. boot.img (pmbootstrap's) goes as-is; its cmdline pmos_root_uuid MUST match root.img UUID.
+5. `tar -H ustar -cf pmos.tar boot.img system.img; md5sum -t pmos.tar >> pmos.tar; mv .md5`
+6. Flash: `sudo ~/.local/bin/odin4 -a pmos.tar.md5` (device in download mode).
+7. Host net after boot (iface name changes each boot):
+   `sudo nmcli device set $IFACE managed no; sudo ip addr add 172.16.42.2/24 dev $IFACE`
+
+odin4 binary: github Adrilaw/OdinV4 (Samsung official Linux Odin v1.2.1), ~/.local/bin/odin4.
+
+## REMAINING: the garbled display (Phase 1 -> Phase 2)
+Framebuffer diag over SSH: sprdfb, 16bpp, stride=1600 (CORRECT for 800px), virtual 800x3840
+(triple-buffered), mode 800x1280p-60. Stride is right, so NOT a pitch bug -> almost certainly
+a 16bpp color-format / RGB-vs-BGR mismatch (the kernel already ships sprdfb-fix-swapped-colors).
+Debuggable live over SSH now. Next: inspect /dev/fb0 format, try fbcon/color tweaks, then Xorg
+fbdev for the eventual LXDE desktop.
