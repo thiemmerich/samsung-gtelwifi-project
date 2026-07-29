@@ -10,6 +10,31 @@ Spreadtrum SC7730, armv7)** by gluing the postmarketOS reverse-engineered **down
 Raspberry-Pi-OS port (Broadcom kernel can't move) — it's kernel-glue + a Debian-family
 rootfs. End goal: **Devuan (no systemd) + LXDE**, Windows-like feel. See `quest/ROADMAP.md`.
 
+## STATUS (2026-07-29) — 🧵 TLS-BRIDGE RECON: multithreading blocker diagnosed + plan 🧵
+Goal: replace the `stub_pthread.py` hack (nulls bionic mutex funcs → single-thread-only) with a real
+fix, so multithreaded GL works → enables a GPU-composited desktop (Path B). Deep recon (gdb backtrace):
+
+**The crash (stub removed):** `ldr r3,[r0,#0x20]` with `r0=0` inside bionic `libc.so`'s pthread region
+(`pthread_mutex_init`@0xe6d0…`_lock`@0xe8f4) — a **null bionic-TLS deref**. `lr==pc`, both in libc →
+it's **bionic libc calling itself** (intra-library direct `bl`, which bypasses libhybris hooks).
+
+**Root cause:** our libhybris port has **no bionic TLS setup** (no `__set_tls`/`TLS_SLOT` anywhere) and
+the bundled linker (`common/jb/linker.c:1607`) **skips libc.so's constructors** (which would init that
+TLS). But it still loads+binds bionic libc.so. Symbol resolution (`linker.c:1376`) checks hooks FIRST,
+so the blob's own pthread calls hit our (working, musl-backed) hooks — but **46 of the blob's 118 libc
+imports are unhooked** and bind to bionic libc.so; one of those bionic funcs makes an internal (direct,
+unhookable) call into bionic pthread → null TLS → crash.
+
+**THE FIX (strategy 1, chosen — clean, no TPIDRURO coexistence needed):** hook the remaining ~46
+symbols to musl so **nothing binds to bionic libc.so** → bionic libc code never executes → drop the
+stub. All 118 imports → musl (real TLS); blob threads become musl threads (valid TLS) via the existing
+`_hybris_hook_pthread_create`. The linker is already built for this (hooks-first + skip-libc-ctors); the
+prior port just didn't finish coverage. The 46: mostly libm (`sin/cos/pow/sqrt/atan2/floor/…`) + a few
+syscall wrappers (`close/read/dup/fstat/syscall/sched_*/usleep/kill`), `ion_*`, `gettimeofday/qsort/
+atoi/strtoul/lrand48/remove/getenv`, `__aeabi_uldivmod/__aeabi_unwind_*/__isnanf/__popcountsi2`.
+Strategy 2 (actually set up bionic per-thread TLS) is the harder fallback, now unnecessary.
+Recon tooling: `gpu-tls/` diffs, `gpu_cube.c` now has an async-signal-safe crash reporter (PC/LR+maps).
+
 ## STATUS (2026-07-29) — 🧊 REAL 3D ON MALI: `GL_RENDERER=Mali-400 MP`, ~22–28 fps 🧊
 A self-contained lit, depth-buffered, spinning 6-colour cube (`gpu-demos/gpu_cube.c`) runs a full
 3D pipeline — perspective projection, GL_DEPTH_TEST, per-fragment diffuse+specular lighting — on the

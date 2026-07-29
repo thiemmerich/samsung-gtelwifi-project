@@ -8,8 +8,39 @@
 #include <string.h>
 #include <math.h>
 #include <sys/time.h>
+#include <signal.h>
+#include <ucontext.h>
+#include <unistd.h>
+#include <fcntl.h>
 #include <EGL/egl.h>
 #include <GLES2/gl2.h>
+
+/* async-signal-safe crash reporter: dumps faulting PC/LR + /proc/self/maps so we can
+ * map the addresses to a library+offset (and thus a function) on the host. */
+static void _wr(const char *s){ write(2, s, strlen(s)); }
+static void _whex(unsigned long v){
+    char b[11]="0x00000000";
+    for(int i=0;i<8;i++){ int nib=(v>>((7-i)*4))&0xf; b[2+i]=nib<10?('0'+nib):('a'+nib-10); }
+    write(2,b,10);
+}
+static void _crash(int sig, siginfo_t *si, void *uc_){
+    ucontext_t *uc=(ucontext_t*)uc_;
+    _wr("\n*** CRASH sig="); _whex(sig);
+    _wr(" pc="); _whex(uc->uc_mcontext.arm_pc);
+    _wr(" lr="); _whex(uc->uc_mcontext.arm_lr);
+    _wr(" fp="); _whex(uc->uc_mcontext.arm_fp);
+    _wr(" addr="); _whex((unsigned long)si->si_addr);
+    _wr("\n=== /proc/self/maps ===\n");
+    int f=open("/proc/self/maps",O_RDONLY);
+    if(f>=0){ char buf[8192]; int n; while((n=read(f,buf,sizeof buf))>0) write(2,buf,n); close(f); }
+    _wr("=== end ===\n");
+    _exit(139);
+}
+static void _install_crash(void){
+    struct sigaction sa; memset(&sa,0,sizeof sa);
+    sa.sa_sigaction=_crash; sa.sa_flags=SA_SIGINFO;
+    sigaction(SIGSEGV,&sa,0); sigaction(SIGBUS,&sa,0); sigaction(SIGABRT,&sa,0);
+}
 
 static const char *VS =
 "attribute vec3 aPos;\n"
@@ -72,6 +103,7 @@ static GLuint compile(GLenum type, const char *src){
 
 int main(int argc, char **argv){
     int frames = (argc==2)? atoi(argv[1]) : 1800;
+    if(!getenv("NOCRASH")) _install_crash();
 
     EGLDisplay dpy = eglGetDisplay(EGL_DEFAULT_DISPLAY);
     eglInitialize(dpy,0,0);
