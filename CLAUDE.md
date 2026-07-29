@@ -10,6 +10,23 @@ Spreadtrum SC7730, armv7)** by gluing the postmarketOS reverse-engineered **down
 Raspberry-Pi-OS port (Broadcom kernel can't move) — it's kernel-glue + a Debian-family
 rootfs. End goal: **Devuan (no systemd) + LXDE**, Windows-like feel. See `quest/ROADMAP.md`.
 
+## STATUS (2026-07-29) — 🧊 REAL 3D ON MALI: `GL_RENDERER=Mali-400 MP`, ~22–28 fps 🧊
+A self-contained lit, depth-buffered, spinning 6-colour cube (`gpu-demos/gpu_cube.c`) runs a full
+3D pipeline — perspective projection, GL_DEPTH_TEST, per-fragment diffuse+specular lighting — on the
+hardware GPU (the driver reports `GL_RENDERER=Mali-400 MP`). **21.8 fps with vsync, 27.9 fps without**
+(`HYBRIS_FB_NOVSYNC=1`) at 800×1280. Rung 4 (a real GLES2 app on the GPU) DONE.
+
+Build: `g++` against the libhybris `.so`s (see the compile line captured in git history / gpu_cube.c
+header). Run with the same env as the tests (`EGL_PLATFORM=fbdev`, `HYBRIS_LD_LIBRARY_PATH`, the
+`LD_LIBRARY_PATH` list). Uses `eglGetDisplay(EGL_DEFAULT_DISPLAY)` + NULL-window fullscreen fbdev +
+`EGL_DEPTH_SIZE 16`; the 8888→565 downconvert handles the panel.
+
+**fps ceiling is the software downconvert (memory-latency-bound: uncached GPU-buffer read + 2 MB/frame
+write to /dev/fb0), NOT the GPU or the convert arithmetic** (32-bit-word load vs byte loads made no
+difference; vsync costs ~6 fps). The real speed unlock is the hardware DISPC-overlay/GSP-blit path
+(zero CPU pixel-touch) — same big lift as the Wayland-compositor work, deferred. NEON would only shave
+the arithmetic, not the memory stalls.
+
 ## STATUS (2026-07-29) — 🌈 FULL-COLOR GPU RENDERING VALIDATED 🌈
 Correct-color, full-screen, artifact-free Mali-400 GLES2 — validated with a color-cycling,
 gradient-shaded, drifting diamond (per-pixel shading + all 3 channels + transforms + animation all

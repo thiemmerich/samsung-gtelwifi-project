@@ -11,7 +11,7 @@ if "_hybris_vsync_fd" in s:
     print("already patched"); sys.exit(0)
 
 # headers
-for h in ("<fcntl.h>", "<sys/ioctl.h>", "<linux/fb.h>"):
+for h in ("<fcntl.h>", "<sys/ioctl.h>", "<linux/fb.h>", "<stdlib.h>"):
     if h not in s:
         s = s.replace('#include "fbdev_window.h"',
                       '#include "fbdev_window.h"\n#include %s' % h, 1)
@@ -27,7 +27,8 @@ static void _hybris_wait_vsync(void)
 {
     if (_hybris_vsync_fd == -2)
         _hybris_vsync_fd = open("/dev/fb0", O_RDWR | O_CLOEXEC);
-    if (_hybris_vsync_fd >= 0) {
+    /* HYBRIS_FB_NOVSYNC=1 skips the gate (faster, but tears) — used for benchmarking. */
+    if (_hybris_vsync_fd >= 0 && !getenv("HYBRIS_FB_NOVSYNC")) {
         unsigned int crtc = 0;
         ioctl(_hybris_vsync_fd, FBIO_WAITFORVSYNC, &crtc);
     }

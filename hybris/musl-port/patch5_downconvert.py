@@ -45,13 +45,14 @@ static void _hybris_downconvert_to_fb(buffer_handle_t handle, int w, int h, int 
     int cols = w;
     if (cols > _hybris_fbc_stride / 2) cols = _hybris_fbc_stride / 2;
     for (int y = 0; y < rows; y++) {
-        const unsigned char *sp = (const unsigned char *)src + (size_t)y * src_stride_px * 4;
+        /* read each pixel as one 32-bit word (RGBA8888 LE: R=b0 G=b1 B=b2) */
+        const unsigned int *sw = (const unsigned int *)((const unsigned char *)src
+                                                        + (size_t)y * src_stride_px * 4);
         unsigned short *dp = (unsigned short *)((unsigned char *)_hybris_fbc_map
                                                 + (size_t)y * _hybris_fbc_stride);
         for (int x = 0; x < cols; x++) {
-            unsigned char r = sp[0], g = sp[1], b = sp[2];
-            dp[x] = (unsigned short)(((r & 0xF8) << 8) | ((g & 0xFC) << 3) | (b >> 3));
-            sp += 4;
+            unsigned int px = sw[x];
+            dp[x] = (unsigned short)(((px & 0xF8) << 8) | ((px & 0xFC00) >> 5) | ((px & 0xF80000) >> 19));
         }
     }
     hybris_gralloc_unlock(handle);
