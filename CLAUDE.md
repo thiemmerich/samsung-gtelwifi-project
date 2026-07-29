@@ -195,6 +195,27 @@ to the public repo). Facts:
      `--enable-trace --enable-debug` + `HYBRIS_TRACE=1` to log the exact call sequence. Static gap
      list (unhooked blob imports) in this session's notes: ion_*, hw_get_module, sem_*, sync_wait,
      android_atomic_*, __aeabi_*, close/dup/ioctl/clock_gettime, etc.
+   - 🧭 **SESSION 2b (2026-07-28 late) — diagnosis attempts + narrowing:**
+     - Built libhybris with `--enable-debug --enable-trace` (clean rebuild). BUT `HYBRIS_LINKER_DEBUG=3`
+       + `HYBRIS_TRACE=1` produced NO extra output → the jb linker's `TRACE_TYPE(LOOKUP,...)` is gated
+       by a compile-time `#if LINKER_DEBUG` that `--enable-debug` does NOT set. **To get symbol-resolution
+       logging, add `-DLINKER_DEBUG` (and check `linker_debug.h`) to the build**, OR use a targeted gdb.
+     - Stack-scan caller-ID was UNRELIABLE: the "gralloc return addresses" I chased (0x32b3 etc.) are
+       PAST gralloc's `.text` (ends 0x2afc) → they're gralloc *data*, not code. Don't trust raw stack
+       scans; use `.text` bounds (`objdump -h`, ARM objdump only works ON the tablet, not host x86).
+     - **Prime remaining suspect = `ion_*`** (gralloc's unhooked imports: ion_open/ion_alloc/ion_free/
+       ion_share/ion_sync_fd/ion_close/ion_invalidate_fd). Crash happens RIGHT AFTER gralloc prints the
+       fb info — i.e., when it allocates the framebuffer/graphics buffer via ION. These fall through to
+       bionic libc.so's ion helpers → bionic internal state → pthread crash. Other still-unhooked:
+       `clock_gettime close dup ioctl atol glFinish __aeabi_l2f __aeabi_uldivmod`.
+   - **➡️ CONCRETE NEXT MOVES (pick one, fresh session):**
+     1. **Hook `ion_*`** with musl-side impls (thin ioctl wrappers on `/dev/ion`; need the legacy ion
+        UAPI + Spreadtrum heap ids). Most likely to unblock — gralloc buffer alloc is exactly here.
+     2. **gdb break on bionic `pthread_mutex_init`** (`break *(libc_base+0xe6d0)`; gdb disables ASLR so
+        libc_base is stable) → at hit, read `$lr` (bionic caller) → resolve via `readelf -sW` libc.so.
+     3. **Add `-DLINKER_DEBUG`** to CPPFLAGS + rebuild → get the definitive hook-vs-bionic symbol list.
+     4. **Root fix:** wire libhybris's bionic main-thread TLS (jb linker `__libc_init_tls`, commented out)
+        so bionic funcs stop deref-ing null TLS — fixes ALL these at once (hardest, cleanest).
    - **RUNTIME ENV (updated):** `sudo chmod 666 /dev/mali0 /dev/ion /dev/fb0`; `/system/build.prop`
      staged; `HYBRIS_LD_LIBRARY_PATH=/system/lib:/vendor/lib`; `LD_LIBRARY_PATH=<build>/{egl,glesv2,
      common,hardware,properties,libsync,egl/platforms/fbdev}/.libs`; `EGL_PLATFORM=fbdev`. Diagnostics:
