@@ -253,9 +253,20 @@ to the public repo). Facts:
         666 /dev/{mali0,ion,fb0}`.
      8. Runtime env: `HYBRIS_LD_LIBRARY_PATH=/system/lib:/vendor/lib`; `LD_LIBRARY_PATH=<build>/{egl,
         glesv2,common,hardware,properties,libsync,egl/platforms/fbdev}/.libs`; `EGL_PLATFORM=fbdev`.
-   - **REMAINING POLISH (not blockers):** (a) fb format match (tiled-RGBA→linear-RGB565) for a clean
-     image; (b) replace the pthread-stub hack with a real bionic-TLS bridge (for multithreaded GL apps);
-     (c) harmless `ion_client` close error at teardown; (d) then glmark2-es2, GL compositor, X GLAMOR.
+   - ✅ **CLEAN TRIANGLE ACHIEVED (2026-07-29).** The checkerboard/garbling was NOT a kernel/fb format
+     bug — it was `test_glesv2` using `create_hwcomposer_window()` (wrong platform!). Fix: use the fbdev
+     window like `test_egl` does — pass **`NULL`** to `eglCreateWindowSurface` → the fbdev platform builds
+     a full-screen `FbDevNativeWindow` (`fbdevws_CreateWindow`). Patched test_glesv2 (bypass
+     create_hwcomposer_window, surface arg → NULL) + `sudo dd if=/dev/zero of=/dev/fb0` to clear stale fb
+     + **reboot to reset the X/fb fighting**. Result: crisp solid triangle on white, GPU-rendered. The
+     concentric rings = the spinning/scaling triangle composited across frames (single-buffered, no
+     page-flip). CONFIRMED clean GPU render on the panel. 🔺
+     - TIP for a clean render: stop the X server first (`sudo rc-service tinydm stop` or kill X) so the
+       GPU test owns /dev/fb0 exclusively (no LXQt desktop underneath fighting the framebuffer).
+   - **REMAINING POLISH (not blockers):** (a) double-buffering / page-flip for a single crisp frame
+     (fb only had room for 1 buffer → single-buffered ripple); (b) window fills ~60% of panel (aspect);
+     (c) replace the pthread-stub hack with a real bionic-TLS bridge (for multithreaded GL apps);
+     (d) harmless `ion_client` close error at teardown; (e) then glmark2-es2, GL compositor, X GLAMOR.
    - **➡️ (historical) next moves that led to the solution — kept for reference:**
      0. **Find the unhooked bionic fn via NON-gdb means:** it's called right after gralloc prints fb
         info. Statically find which loaded Android lib (libutils/libcutils/libmemoryheapion/sprd libs
