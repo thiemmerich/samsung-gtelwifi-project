@@ -282,6 +282,16 @@ to the public repo). Facts:
        is consistently 32bpp/3200 end-to-end (or force 16bpp). `fbprobe.c` (in `hybris/musl-port/`? no —
        `~/pmos-odin/gpu/fbprobe.c`) is the ioctl probe tool. Also try double-buffering + stopping X.
      - ⚠️ Don't run `fbprobe` PUT16/PUT32 before a real render — it leaves the fb in a bad state until reboot.
+   - 🔬 **STRIDE FIXED, TILING REMAINS (2026-07-29).** The 16bpp ioctl-pin (patch3) FIXED the
+     half-screen — render now fills the full panel (confirmed bpp=16 stride=1600). But a solid-color
+     test reveals a **regular black/white GRID** over solid fills (triangle geometry visible underneath).
+     Root: **Mali-400 is a TILE-based renderer** writing its framebuffer output in a tiled/swizzled
+     layout, while sprdfb scans out LINEARLY → solid regions become a periodic grid. On real Android the
+     DISPC/GSP de-tiled Mali buffers during scanout; our direct /dev/fb0 path scans linear → sees raw
+     tiles. **NEXT (deep):** force Mali linear framebuffer output (gralloc usage / a Mali env / the
+     `rgb_is_xrgb` variant), OR enable the sprdfb DISPC tiled-scanout mode (kernel), OR blit-detile in the
+     fbdev `post()`. To make the solid test even RUN: its `phase` uniform gets optimized out when the
+     shader is solid → relaxed the `phase_loc<0` check in test_glesv2.cpp (else early-return→black).
    - **REMAINING POLISH (not blockers):** (a) double-buffering / page-flip for a single crisp frame
      (fb only had room for 1 buffer → single-buffered ripple); (b) window fills ~60% of panel (aspect);
      (c) replace the pthread-stub hack with a real bionic-TLS bridge (for multithreaded GL apps);
