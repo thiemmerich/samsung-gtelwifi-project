@@ -10,6 +10,34 @@ Spreadtrum SC7730, armv7)** by gluing the postmarketOS reverse-engineered **down
 Raspberry-Pi-OS port (Broadcom kernel can't move) — it's kernel-glue + a Debian-family
 rootfs. End goal: **Devuan (no systemd) + LXDE**, Windows-like feel. See `quest/ROADMAP.md`.
 
+## STATUS (2026-07-29) — 🌈 FULL-COLOR GPU RENDERING VALIDATED 🌈
+Correct-color, full-screen, artifact-free Mali-400 GLES2 — validated with a color-cycling,
+gradient-shaded, drifting diamond (per-pixel shading + all 3 channels + transforms + animation all
+confirmed). This closes the last GPU bug: **wrong colors** (green rendered as gold).
+
+**Root cause (took the whole session):** the sprdfb panel path is HARDWIRED 16bpp RGB565
+(`line_length` locked at 1600 — `FBIOPUT_VSCREENINFO bpp=32` is accepted but stride stays 1600 →
+half-screen). The Mali fbdev blob ALWAYS renders 32bpp RGBA8888 for this path (ignores 565 EGL
+configs AND a forced 565 gralloc buffer format). The proprietary `fb_post` does a dumb `memcpy`
+with **no format conversion**. So Mali's 8888 bytes were being scanned out as 565 → `[00,FF,00,FF]`
+green read as `0xFF00` = gold; blue dropped entirely; geometry half-width (hidden by flat fills).
+
+**THE FIX — `hybris/musl-port/patch5_downconvert.py`:** render into a LINEAR, CPU-readable,
+offscreen RGBA8888 buffer (`GRALLOC_USAGE_HW_RENDER|HW_TEXTURE|SW_READ_OFTEN`, format
+`RGBA_8888`, NOT `HW_FB`), then do our OWN 8888→565 downconvert in `FbDevNativeWindow::queueBuffer`
+(replacing `hybris_gralloc_fbdev_post`): `hybris_gralloc_lock()` the buffer, pack
+`((r&0xF8)<<8)|((g&0xFC)<<3)|(b>>3)` straight into an `mmap` of `/dev/fb0` (16bpp, stride 1600).
+Rebuild+install `eglplatform_fbdev.so` to `/usr/local/lib/libhybris/`. ~1M px/frame CPU pass — a
+few ms, fine. Also `patch4_vsync.py`: `FBIO_WAITFORVSYNC` gate before post (sprdfb honours it even
+though it refuses fbdev panning) to cut tearing.
+
+**Dead ends (don't repeat):** (1) forcing a 565 EGLConfig — blob ignores it (565 configs DO exist:
+indices 0,1,2,17 = R5G6B5A0 buf16). (2) forcing gralloc buffer format `RGB_565` at alloc — ignored.
+(3) pinning fb to 32bpp ABGR8888 (`hook_32bpp.py`) — sprdfb keeps 1600 stride → half-screen.
+**CRITICAL measurement gotcha:** raw `/dev/fb0` dumps are MISLEADING (the DISPC scans a separate
+ION overlay; fb0's legacy smem ≠ what's on the panel). Trust your eyes or `glReadPixels`, not fb0
+byte dumps. Tools: `set_test_color.py`, `dump_fb.py`, `pick_565_config.py`, `validate_show.py`.
+
 ## STATUS (2026-07-29) — 🏆🏆 CLEAN GPU TRIANGLE — QUEST COMPLETE 🏆🏆
 CRISP, ARTIFACT-FREE Mali-400 GLES2 render full-screen on the panel. Final fix: force the fbdev
 window buffer to a LINEAR scanout allocation (`GRALLOC_USAGE_HW_FB` only, not Mali's tiled
