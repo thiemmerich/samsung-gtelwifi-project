@@ -25,15 +25,32 @@ so the blob's own pthread calls hit our (working, musl-backed) hooks — but **4
 imports are unhooked** and bind to bionic libc.so; one of those bionic funcs makes an internal (direct,
 unhookable) call into bionic pthread → null TLS → crash.
 
-**THE FIX (strategy 1, chosen — clean, no TPIDRURO coexistence needed):** hook the remaining ~46
-symbols to musl so **nothing binds to bionic libc.so** → bionic libc code never executes → drop the
-stub. All 118 imports → musl (real TLS); blob threads become musl threads (valid TLS) via the existing
-`_hybris_hook_pthread_create`. The linker is already built for this (hooks-first + skip-libc-ctors); the
-prior port just didn't finish coverage. The 46: mostly libm (`sin/cos/pow/sqrt/atan2/floor/…`) + a few
-syscall wrappers (`close/read/dup/fstat/syscall/sched_*/usleep/kill`), `ion_*`, `gettimeofday/qsort/
-atoi/strtoul/lrand48/remove/getenv`, `__aeabi_uldivmod/__aeabi_unwind_*/__isnanf/__popcountsi2`.
-Strategy 2 (actually set up bionic per-thread TLS) is the harder fallback, now unnecessary.
-Recon tooling: `gpu-tls/` diffs, `gpu_cube.c` now has an async-signal-safe crash reporter (PC/LR+maps).
+**Strategy 1 (blanket-hook remaining libc/libm → musl) ATTEMPTED — does NOT work cleanly:**
+`patch6_libc_hooks.py` added 36 `HOOK_DIRECT_NO_DEBUG` entries (15 libc syscall wrappers + 21 libm).
+Result: it *moved* the crash PAST the bionic-pthread null-TLS deref (progress → confirms bionic libc is
+in the loop) but introduced a NEW early crash: `pc=0` (call through a null pointer) during startup,
+BEFORE the blob loads, and it regresses even the stubbed baseline (verified in fresh processes, not
+GPU-state corruption). All 36 symbols DO exist in musl (checked `nm -D`), so it's not a null-symbol
+hook — blanket hooking perturbs the load/init path (libGLES_trace.so starts loading; suspected
+uninitialised GLES dispatch). Reverted; baseline works again (22.8 fps). patch6 kept local, NOT
+committed (regresses).
+
+**Original crash, fully characterised (gdb, stubless):** faults at bionic libc.so `+0xe7c4`
+(`ldr r3,[r0,#0x20]`, r0=0, i.e. null bionic TLS) inside `pthread_mutex_init`(0xe6d0)/`_lock`(0xe8f4)
+region. Reached through MANY intra-libc frames (stack is all `0xb6c6xxxx`/`0xb6c7xxxx`/`0xb6c8xxxx` =
+bionic libc), so there is NO single external caller to hook surgically — bionic libc genuinely needs a
+valid TLS internally. r1=0x14, r3=exe addr. gdb can't unwind bionic (no CFI) and doesn't see the
+jb.so-loaded Android libs in `info sharedlibrary`.
+
+**CONCLUSION — the real fix is Strategy 2: actually set up minimal bionic per-thread TLS** (allocate a
+bionic-layout TLS block, populate the slots bionic reads via the thread register, coexisting with
+musl's use of TPIDRURO). This is what mature libhybris does (its linker's `__set_tls`), which our port
+omitted. It's the genuine TPIDRURO-coexistence work — multi-session, the hardest piece of the quest.
+Blanket-eliminating bionic libc (strategy 1) is not viable because bionic libc.so is loaded and its
+internal pthread/TLS use is reached through too many paths. NEXT: study upstream libhybris bionic-TLS
+setup + implement a minimal version in `common/jb/linker.c`/`hooks.c`. Meanwhile the stub keeps
+single-threaded GPU working (Path A remains viable now).
+Recon tooling: `gpu-tls/` diffs, `gpu_cube.c` async-signal-safe crash reporter (PC/LR+maps), `/tmp/g.gdb`.
 
 ## STATUS (2026-07-29) — 🧊 REAL 3D ON MALI: `GL_RENDERER=Mali-400 MP`, ~22–28 fps 🧊
 A self-contained lit, depth-buffered, spinning 6-colour cube (`gpu-demos/gpu_cube.c`) runs a full
