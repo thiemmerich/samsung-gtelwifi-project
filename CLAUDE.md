@@ -10,6 +10,13 @@ Spreadtrum SC7730, armv7)** by gluing the postmarketOS reverse-engineered **down
 Raspberry-Pi-OS port (Broadcom kernel can't move) — it's kernel-glue + a Debian-family
 rootfs. End goal: **Devuan (no systemd) + LXDE**, Windows-like feel. See `quest/ROADMAP.md`.
 
+## STATUS (2026-07-29) — 🏆🏆 CLEAN GPU TRIANGLE — QUEST COMPLETE 🏆🏆
+CRISP, ARTIFACT-FREE Mali-400 GLES2 render full-screen on the panel. Final fix: force the fbdev
+window buffer to a LINEAR scanout allocation (`GRALLOC_USAGE_HW_FB` only, not Mali's tiled
+HW_RENDER buffer) — killed the tile-writeback grid. See `hybris/musl-port/fix_fbdev_linear.md`.
+Full chain: /dev/mali0 (ported kernel driver) → libhybris musl port → fbdev EGL → 16bpp-pinned +
+linear fb → clean triangle. From "can it run Raspbian?" to a proprietary GPU rendering under musl.
+
 ## STATUS (2026-07-29) — 🏆 MALI-400 GPU RENDERS GLES2 via libhybris/musl 🏆
 THE ULTIMATE HACK WORKS: proprietary Mali-400 driver runs on postmarketOS/musl through our
 first-of-its-kind libhybris musl port — `test_glesv2` draws a spinning triangle (1740+ frames) to
