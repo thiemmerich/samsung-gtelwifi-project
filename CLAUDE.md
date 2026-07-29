@@ -208,7 +208,22 @@ to the public repo). Facts:
        fb info — i.e., when it allocates the framebuffer/graphics buffer via ION. These fall through to
        bionic libc.so's ion helpers → bionic internal state → pthread crash. Other still-unhooked:
        `clock_gettime close dup ioctl atol glFinish __aeabi_l2f __aeabi_uldivmod`.
-   - **➡️ CONCRETE NEXT MOVES (pick one, fresh session):**
+   - ✅ **ROOT CAUSE CONFIRMED (2026-07-28 session 2c):** the crash is the **ARM bionic↔musl TLS
+     collision**, NOT a single missing hook. Evidence: gralloc's `pthread_mutex_init/lock/unlock`
+     imports ARE hooked (→ musl), yet the crash PC is inside *bionic* `libc.so` `pthread_mutex_init`
+     (+0xf4, deref null+0x20). So an **unhooked bionic libc function** (reached via import→bionic
+     because not hooked) calls bionic's OWN pthread *internally* (intra-.so, bypassing the hook).
+     Bionic pthread reads `TPIDRURO` (the ARM user thread register) for TLS — but musl owns that
+     register, so bionic gets musl's TCB, reads a null `pthread_internal_t` at TLS_SLOT_THREAD_ID,
+     derefs +0x20 → SIGSEGV. libhybris only makes bionic TLS valid on threads IT wraps; its
+     `_hybris_hook_pthread_create` just forwards to musl (no bionic-TLS setup), and our main thread is
+     pure musl. gdb caller-ID is BLOCKED (bionic libc.so stripped, no CFI; even
+     `HYBRIS_ENABLE_LINKER_DEBUG_MAP=1` can't symbolize/unwind it).
+   - **➡️ CONCRETE NEXT MOVES (pick one, fresh session — this is the research frontier):**
+     0. **Find the unhooked bionic fn via NON-gdb means:** it's called right after gralloc prints fb
+        info. Statically find which loaded Android lib (libutils/libcutils/libmemoryheapion/sprd libs
+        that gralloc NEEDs) exports a fn gralloc calls next, that internally uses pthread. Then hook it
+        or replace that lib with libhybris's own.  (ltrace won't see intra-.so calls.)
      1. **Hook `ion_*`** with musl-side impls (thin ioctl wrappers on `/dev/ion`; need the legacy ion
         UAPI + Spreadtrum heap ids). Most likely to unblock — gralloc buffer alloc is exactly here.
      2. **gdb break on bionic `pthread_mutex_init`** (`break *(libc_base+0xe6d0)`; gdb disables ASLR so
