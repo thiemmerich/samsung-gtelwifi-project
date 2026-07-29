@@ -10,6 +10,13 @@ Spreadtrum SC7730, armv7)** by gluing the postmarketOS reverse-engineered **down
 Raspberry-Pi-OS port (Broadcom kernel can't move) — it's kernel-glue + a Debian-family
 rootfs. End goal: **Devuan (no systemd) + LXDE**, Windows-like feel. See `quest/ROADMAP.md`.
 
+## STATUS (2026-07-29) — 🏆 MALI-400 GPU RENDERS GLES2 via libhybris/musl 🏆
+THE ULTIMATE HACK WORKS: proprietary Mali-400 driver runs on postmarketOS/musl through our
+first-of-its-kind libhybris musl port — `test_glesv2` draws a spinning triangle (1740+ frames) to
+the panel via `/dev/mali0`. Full winning recipe in "THE ULTIMATE HACK" section below (search
+"SOLVED / GPU RENDERS"). Polish remaining: fb format match (tiled→RGB565), proper TLS bridge vs the
+pthread-stub hack. Prior wins below still hold ↓
+
 ## STATUS (2026-07-28) — LXQt DESKTOP + TOUCH + WiFi + KEYBOARD WORK 🎉
 - Full **LXQt desktop** (pmOS `ui=lxqt`, tablet build) runs on the panel, **driven by the
   touchscreen**; battery/power-manager read fine. Software-rendered X on sprdfb (no GPU) — pokey but usable.
@@ -219,7 +226,37 @@ to the public repo). Facts:
      `_hybris_hook_pthread_create` just forwards to musl (no bionic-TLS setup), and our main thread is
      pure musl. gdb caller-ID is BLOCKED (bionic libc.so stripped, no CFI; even
      `HYBRIS_ENABLE_LINKER_DEBUG_MAP=1` can't symbolize/unwind it).
-   - **➡️ CONCRETE NEXT MOVES (pick one, fresh session — this is the research frontier):**
+   - 🏆🏆🏆 **SOLVED / GPU RENDERS (2026-07-29) — THE ULTIMATE HACK WORKS.** `test_glesv2` renders
+     1740+ frames (spinning triangle) on the Mali-400 via libhybris/musl; `test_egl` completes
+     (context+surface+render loop+teardown, rc=0); `test_egl_configs` = 25 configs. GPU-rendered
+     pixels confirmed ON THE PANEL (garbled/tiled — Mali outputs tiled-RGBA vs sprdfb linear-RGB565;
+     a format-match polish item, NOT a failure). **THE COMPLETE WINNING RECIPE (all pieces required):**
+     1. Kernel Mali driver → `/dev/mali0` (patches/0002 + vendored tarball). ✅
+     2. libhybris `1b6090ad` + `0001` musl patch + GCC-15 fixes (ftello/fseeko fpos, XSI strerror_r)
+        + `linux-{sync,sw_sync}.h`. Build: `apk add bsd-compat-headers libx11-dev libxext-dev`.
+     3. Hooks added to `hybris/common/hooks.c`: `patch_androidlog.py` (__android_log_* → stderr),
+        `patch2_hooks.py` (fortify __*_chk + C++ new/delete → musl).
+     4. `hybris/musl-port/fix_consumer_usage.py`: in `egl/platforms/common/nativewindowbase.cpp` move
+        `NATIVE_WINDOW_CONSUMER_USAGE_BITS` OUT of `#if ANDROID_VERSION_MAJOR>=6` (Mali KitKat blob
+        queries it → else BAD_VALUE → surface-create fails). getUsage() returns 0x602 (HW_RENDER|TEXTURE).
+     5. ⚠️ **THE TLS-COLLISION BYPASS (`hybris/musl-port/stub_pthread.py`):** binary-patch bionic
+        `/system/lib/libc.so` — stub `pthread_mutex_init/lock/unlock/trylock/destroy` to ARM
+        `mov r0,#0; bx lr`. Neutralizes the bionic-internal pthread calls that crash on the musl main
+        thread's TLS. CRUDE (no-op mutexes → only safe for ~single-threaded bring-up); the *proper* fix
+        is a bionic main-thread TLS bridge. Offsets from `readelf -sW` (ARM, not thumb).
+     6. ⚠️ **INSTALL-PATH GOTCHA (cost hours):** libhybris dlopens the EGL platform from its compiled-in
+        pkglibdir = **`/usr/local/lib/libhybris/`** (prefix defaulted to /usr/local). Edits to the
+        build-dir platform libs DO NOTHING until you `sudo cp` them over `/usr/local/lib/
+        libhybris-eglplatformcommon.so.1.0.0` + `/usr/local/lib/libhybris/eglplatform_fbdev.so` (or
+        `make install`). `strace -e openat` to see which .so actually loads.
+     7. Stage `/system` + `/system/build.prop` (ro.board.platform=sc8830 → gralloc.sc8830); `sudo chmod
+        666 /dev/{mali0,ion,fb0}`.
+     8. Runtime env: `HYBRIS_LD_LIBRARY_PATH=/system/lib:/vendor/lib`; `LD_LIBRARY_PATH=<build>/{egl,
+        glesv2,common,hardware,properties,libsync,egl/platforms/fbdev}/.libs`; `EGL_PLATFORM=fbdev`.
+   - **REMAINING POLISH (not blockers):** (a) fb format match (tiled-RGBA→linear-RGB565) for a clean
+     image; (b) replace the pthread-stub hack with a real bionic-TLS bridge (for multithreaded GL apps);
+     (c) harmless `ion_client` close error at teardown; (d) then glmark2-es2, GL compositor, X GLAMOR.
+   - **➡️ (historical) next moves that led to the solution — kept for reference:**
      0. **Find the unhooked bionic fn via NON-gdb means:** it's called right after gralloc prints fb
         info. Statically find which loaded Android lib (libutils/libcutils/libmemoryheapion/sprd libs
         that gralloc NEEDs) exports a fn gralloc calls next, that internally uses pthread. Then hook it
