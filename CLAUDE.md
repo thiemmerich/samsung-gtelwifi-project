@@ -263,6 +263,25 @@ to the public repo). Facts:
      page-flip). CONFIRMED clean GPU render on the panel. 🔺
      - TIP for a clean render: stop the X server first (`sudo rc-service tinydm stop` or kill X) so the
        GPU test owns /dev/fb0 exclusively (no LXQt desktop underneath fighting the framebuffer).
+   - 🔬 **CLEAN-IMAGE INVESTIGATION (2026-07-29, deep dive — the garbling is a kernel display-format
+     issue, NOT the GPU).** Symptom: half-height image + black/white checkerboard = fb is effectively
+     16bpp-stride (line_length=1600) while `gralloc.sc8830` forces 32bpp (RGBA) render → Mali writes
+     3200 B/row into a 1600-stride scanout → overflow + color garble. Findings in `drivers/video/sprdfb`:
+     - `sprdfb_main.c:56` `#define SPRDFB_IN_DATA_TYPE SPRD_IN_DATA_TYPE_ABGR888` → `:646` switch sets
+       `dev->bpp=32` → `:214` `fix.line_length = panel->width*bpp/8` = 800*4 = **3200 at INIT** (should
+       be right!). No other `dev->bpp=16` override exists.
+     - `sprdfb_dispc.c:1260` (`#ifdef BIT_PER_PIXEL_SURPPORT`): DISPC input format from
+       `var.bits_per_pixel` (32→ABGR + rb-switch; else RGB565). `:1253` `DISPC_OSD_PITCH = var.xres`
+       (pixels). `BIT_PER_PIXEL_SURPPORT` IS defined (sprdfb.h:31) → runtime bpp change allowed.
+     - Runtime showed `line_length=1600` + `var.bpp=32` (inconsistent). BUT my `fbprobe` (PUT16/PUT32)
+       CORRUPTED the live fb — `set_par` can't restore 3200, only a reboot re-inits. So runtime readings
+       after fbprobe are unreliable. `gralloc` also force-sets `var.bpp=32` (persists; overrode my PUT16).
+     - **NEXT-SESSION PLAN (dedicated):** (1) fresh reboot, read `/dev/fb0` `line_length`+`bpp` BEFORE
+       any gralloc (is init really 3200?). (2) instrument sprdfb (printk `dev->bpp`, `fix.line_length`,
+       DISPC format reg at probe + on set_par) → rebuild → flash → read dmesg. (3) ensure the WHOLE path
+       is consistently 32bpp/3200 end-to-end (or force 16bpp). `fbprobe.c` (in `hybris/musl-port/`? no —
+       `~/pmos-odin/gpu/fbprobe.c`) is the ioctl probe tool. Also try double-buffering + stopping X.
+     - ⚠️ Don't run `fbprobe` PUT16/PUT32 before a real render — it leaves the fb in a bad state until reboot.
    - **REMAINING POLISH (not blockers):** (a) double-buffering / page-flip for a single crisp frame
      (fb only had room for 1 buffer → single-buffered ripple); (b) window fills ~60% of panel (aspect);
      (c) replace the pthread-stub hack with a real bionic-TLS bridge (for multithreaded GL apps);
