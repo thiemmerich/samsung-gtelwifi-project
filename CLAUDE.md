@@ -10,6 +10,52 @@ Spreadtrum SC7730, armv7)** by gluing the postmarketOS reverse-engineered **down
 Raspberry-Pi-OS port (Broadcom kernel can't move) — it's kernel-glue + a Debian-family
 rootfs. End goal: **Devuan (no systemd) + LXDE**, Windows-like feel. See `quest/ROADMAP.md`.
 
+## ▶ RESUME HERE — start of a new session (updated 2026-07-30)
+A fresh session in this repo loads this file first. Everything you need to continue, in one screen;
+the dated `## STATUS` blocks below (newest first) have the deep detail.
+
+**Tablet access:** `ssh -i ~/pmos-odin/tablet_key user@172.16.42.1`. Build/prep on the HOST, scp
+scripts to the tablet (it lacks some toolchain bits; complex shell over ssh mangles — prefer scp'd
+scripts). WiFi = HENRINHO (passwords stay OFF-chat; the user connects). ⚠️ WiFi was DOWN at last
+check — verify before any `apk add`. Repo: github.com/thiemmerich/samsung-gtelwifi-project — keep
+committing + pushing after each milestone.
+
+**Works now:** pmOS 3.10 kernel boots; **LXQt desktop on touch**; WiFi (BCM4343); **`onboard`
+keyboard** docked (autostart); **screensaver permanently disabled** (panel couldn't wake from it);
+**🏆 Mali-400 GPU renders OpenGL ES 2.0** — crisp, correct-color, `GL_RENDERER=Mali-400 MP`,
+`gpu-demos/gpu_cube.c` lit 3D cube at ~22–28 fps.
+
+**GPU run recipe (single-threaded — keep the stub!):** on tablet `cd ~/libhybris-musl/hybris`;
+the pthread stub MUST stay applied (`stub_pthread.py` patches `/system/lib/libc.so`; `libc.so.orig`
+is the backup) — removing it crashes (see TLS block). Then:
+`export HYBRIS_LD_LIBRARY_PATH=/system/lib:/vendor/lib EGL_PLATFORM=fbdev` and
+`export LD_LIBRARY_PATH=$PWD/egl/.libs:$PWD/glesv2/.libs:$PWD/common/.libs:$PWD/hardware/.libs:$PWD/properties/.libs:$PWD/libsync/.libs:$PWD/egl/platforms/fbdev/.libs`,
+`sudo chmod 666 /dev/mali0 /dev/ion /dev/fb0`, then `./tests/gpu_cube 300`. The EGL platform loads
+from **`/usr/local/lib/libhybris/`** — after editing `egl/platforms/fbdev/fbdev_window.cpp` you must
+`make -C egl/platforms/fbdev && sudo make -C egl/platforms/fbdev install`.
+
+**Next tasks, in order:**
+1. 🔊 **SOUND — queued deep-dive.** Codec present (`card0 sprdphone`, `hw:0,0`); logical DAPM route
+   set (numids in the SOUND STATUS block) but the analog stage stays SILENT (verified via direct
+   `speaker-test -Dplughw:0,0`, so it's the codec, not pulse). No DAPM debugfs, no vendor
+   `mixer_paths.xml`. **PLAN:** read the `sprd-codec` driver's DAPM route table (`sound/soc/sprd/codec/`
+   in the pmaports/vendored kernel source) to find the missing PA/widget/power control; apply once,
+   test (kill pulse first: `autospawn=no` in `~/.config/pulse/client.conf` + `pkill pulseaudio`;
+   REVERT after). Suspects: `Speaker2` PA, external spk-amp GPIO, a DAPM power-sequence ctrl.
+2. 🔵 **BLUETOOTH** — needs WiFi up (firmware); `hciattach` the BCM4343 + a `.hcd`; rfkill already
+   unblocked; `bluetoothctl` installed.
+3. 🌈 **THE DREAM — GPU-composited desktop.** Implement the **bionic-TLS bridge** per
+   `hybris/musl-port/TLS_BRIDGE_PLAN.md` (try strategy 2A: make the linker not load bionic libc +
+   full hook coverage), then a libhybris-EGL Wayland compositor. This is the hardest piece; the
+   crash is fully diagnosed (null bionic-TLS in bionic libc pthread, reached intra-libc).
+
+**Operational gotchas:** screen goes black = screensaver was the cause (now disabled); if it recurs,
+kill `xfce4-screensaver` + `xset dpms force on` + `echo 0 | sudo tee /sys/class/graphics/fb0/blank`.
+To drive the running desktop from ssh, import the session env from `/proc/$(pgrep -x lxqt-session)/environ`
+(DISPLAY=:1, XAUTHORITY, DBUS_SESSION_BUS_ADDRESS, XDG_RUNTIME_DIR). Background procs launched over
+ssh need `setsid` to persist. `/dev/fb0` raw dumps DON'T reflect the panel (DISPC scans an ION
+overlay) — trust eyes/`glReadPixels`, not fb0 bytes.
+
 ## STATUS (2026-07-29) — 🧵 TLS-BRIDGE RECON: multithreading blocker diagnosed + plan 🧵
 Goal: replace the `stub_pthread.py` hack (nulls bionic mutex funcs → single-thread-only) with a real
 fix, so multithreaded GL works → enables a GPU-composited desktop (Path B). Deep recon (gdb backtrace):
