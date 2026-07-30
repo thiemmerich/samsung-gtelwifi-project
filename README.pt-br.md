@@ -51,12 +51,57 @@ cerca de um mês. Então partimos de uma base recente e provavelmente ainda comp
 - **Desktop:** LXDE (o mais leve, sem compositor — cabe na restrição de "sem GPU").
 - **Veículo de bring-up:** Alpine via pmOS, só para provar que o kernel dá boot no aparelho.
 
-## Status
+## Status — um tablet que já roda a GPU 🎉
 
-**Fase 0 concluída (24/07/2026)** — o port arquivado (junho/2026) compila e gera uma
-imagem inicializável (`samsung-gtelwifi.img`) com as ferramentas atuais. A seguir:
-**Fase 1** — gravar no aparelho, recuperação primeiro. Veja [quest/ROADMAP.md](quest/ROADMAP.md),
-[quest/PHASE0.md](quest/PHASE0.md), [quest/PHASE1.md](quest/PHASE1.md).
+O que começou como "será que esse tablet de 2015 dá boot no Linux?" hoje é um **desktop LXQt
+funcionando, controlado por toque, com Wi-Fi, e a GPU Mali-400 proprietária renderizando OpenGL
+ES 2.0 sobre musl** — além de um caminho já mapeado para um desktop 100% composto pela GPU. Log
+técnico completo e receita reproduzível: **[CLAUDE.md](CLAUDE.md)**.
+
+### O que já funciona
+- ✅ **Compilado e gravado** — `samsung-gtelwifi.img` gerado com o pmbootstrap e gravado
+  (Odin/heimdall); dá boot no **kernel 3.10** (engenharia reversa do pmOS) com tela + Wi-Fi BCM4343.
+- ✅ **Desktop LXQt** na tela, controlado pelo **touchscreen**; bateria/energia lidos corretamente.
+- ✅ **Wi-Fi** (BCM4343 / `brcmfmac`).
+- ✅ **Teclado na tela** — `onboard` (GTK), fixo na base, inicia junto com a sessão.
+- ✅ **Fim das telas pretas** — o protetor de tela (que este painel não conseguia acordar) foi
+  desativado de vez.
+- 🏆 **A GPU Mali-400 renderiza OpenGL ES 2.0** — o hack principal, abaixo.
+
+### 🏆 O hack da GPU (o difícil)
+O desktop é renderizado por CPU/software, mas conseguimos fazer o **blob proprietário da GPU
+Android Mali-400 (`libGLES_mali.so`, KitKat / DDK r4p1) rodar no postmarketOS/musl** — provavelmente
+o primeiro port libhybris da era KitKat para musl. Cada camada resolvida de ponta a ponta:
+- Portado o **driver de kernel do Mali** → `/dev/mali0` (`patches/0002-mali-gpu-driver.patch`).
+- **Port do libhybris para musl** — o linker bionic embutido carrega os blobs Android; uma tabela de
+  hooks redireciona as chamadas de libc/pthread deles para o musl.
+- Contornada a **colisão do registrador de thread (TLS) entre bionic e musl** com um stub de pthread
+  (single-thread, suficiente para renderizar).
+- Corrigido o pipeline de vídeo: **fixação do stride 16bpp RGB565**, **buffer de scanout linear**
+  (matou a grade de tiles do Mali) e uma **conversão por software RGBA8888→RGB565** (cores corretas).
+- **Resultado:** GLES2 nítido e com cor correta — validado por um cubo 3D girando, iluminado e com
+  buffer de profundidade (`gpu-demos/gpu_cube.c`) a **~22–28 fps**, com o driver reportando
+  `GL_RENDERER=Mali-400 MP`.
+
+Todos os scripts de patch e a receita passo a passo estão em `hybris/musl-port/` e **[CLAUDE.md](CLAUDE.md)**.
+
+### Em andamento / próximos
+- 🔊 **Som** — o codec Spreadtrum existe (ALSA `card0 sprdphone`, `sprd-codec` HiFi/Voice/FM); a rota
+  de reprodução DAPM (DAC→alto-falante/fone) ainda não engata o estágio analógico. Um mergulho focado
+  no driver do codec está na fila (sem `mixer_paths.xml` do fabricante nem DAPM debugfs — é um
+  bring-up do zero).
+- 🔵 **Bluetooth** — BT combo do BCM4343 (rfkill liberado); precisa de `hciattach` + firmware `.hcd`.
+- 🌈 **O sonho — um desktop 100% composto pela GPU.** Depende de uma **ponte de TLS bionic** de
+  verdade (para substituir o stub de pthread single-thread) → depois um compositor Wayland sobre
+  libhybris-EGL. O bloqueio está diagnosticado e a implementação planejada em
+  **[hybris/musl-port/TLS_BRIDGE_PLAN.md](hybris/musl-port/TLS_BRIDGE_PLAN.md)**; adiado até terminar
+  as peças do dia a dia (som, Bluetooth).
+
+> Obs.: o userspace-alvo continua sendo **Devuan + LXDE**; o bring-up atual roda **postmarketOS
+> (Alpine/musl) + LXQt**, onde todas as vitórias de hardware acima foram provadas.
+
+Veja também [quest/ROADMAP.md](quest/ROADMAP.md), [quest/PHASE0.md](quest/PHASE0.md),
+[quest/PHASE1.md](quest/PHASE1.md).
 
 ## Achados da Fase 0 (o que foi preciso para reviver o port)
 
